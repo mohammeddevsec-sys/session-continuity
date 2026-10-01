@@ -1,0 +1,38 @@
+import crypto from "node:crypto";
+const witnessKeys=crypto.generateKeyPairSync("ed25519");
+const sessionKeys=crypto.generateKeyPairSync("ed25519");
+const canon=x=>JSON.stringify(x);
+const H=x=>crypto.createHash("sha256").update(canon(x)).digest("hex");
+const sign=(k,x)=>crypto.sign(null,Buffer.from(canon(x)),k).toString("base64");
+const verify=(k,x,s)=>crypto.verify(null,Buffer.from(canon(x)),k,Buffer.from(s,"base64"));
+const root=H({type:"CONTINUITY_ROOT",session:"S1",subject:"U1",issuer:"I1"});
+const makeProof=state=>{const body={continuity_root:root,sequence:1,parent_hash:"",state_hash:H(state),decision_hash:H({decision:"ALLOW",policy:"P1"})};body.continuity_hash=H(body);return {body,signature:sign(sessionKeys.privateKey,body)};};
+const proof=makeProof({device:"D1"});
+const alteredBody={...proof.body,state_hash:H({device:"ATTACKED"})};
+const alteredProof={body:alteredBody,signature:proof.signature};
+const forgedProof={body:alteredBody,signature:sign(sessionKeys.privateKey,alteredBody)};
+const receiptBody={witness_schema:"continuity-witness.receipt.v1",continuity_root:root,sequence:1,continuity_hash:proof.body.continuity_hash,observed_proof_hash:H(proof),witness_head_hash:proof.body.continuity_hash};
+const receipt={body:receiptBody,signature:sign(witnessKeys.privateKey,receiptBody)};
+function verifyReceipt(candidate,r){
+ if(!verify(witnessKeys.publicKey,r.body,r.signature))return "INVALID_WITNESS_SIGNATURE";
+ if(!verify(sessionKeys.publicKey,candidate.body,candidate.signature))return "INVALID_PROOF_SIGNATURE";
+ if(r.body.continuity_root!==candidate.body.continuity_root)return "ROOT_MISMATCH";
+ if(r.body.sequence!==candidate.body.sequence)return "SEQUENCE_MISMATCH";
+ if(r.body.continuity_hash!==candidate.body.continuity_hash)return "CONTINUITY_HASH_MISMATCH";
+ if(r.body.observed_proof_hash!==H(candidate))return "PROOF_BINDING_MISMATCH";
+ if(r.body.witness_head_hash!==r.body.continuity_hash)return "HEAD_MISMATCH";
+ return "RECEIPT_VALID";
+}
+const valid=verifyReceipt(proof,receipt);
+const tampered=verifyReceipt(alteredProof,receipt);
+const forged=verifyReceipt(forgedProof,receipt);
+console.log("=== WITNESS RECEIPT MODEL V1.2 ===");
+console.log("VALID="+valid);
+console.log("TAMPERED_PROOF="+tampered);
+console.log("FORGED_ALTERNATE_PROOF="+forged);
+console.log("VALID_RECEIPT="+(valid==="RECEIPT_VALID"?"PASS":"FAIL"));
+console.log("TAMPERED_PROOF_BLOCKED="+(tampered!=="RECEIPT_VALID"?"PASS":"FAIL"));
+console.log("FORGED_ALTERNATE_BLOCKED="+(forged!=="RECEIPT_VALID"?"PASS":"FAIL"));
+console.log("PROOF_SIGNATURE_CHECK="+((tampered==="INVALID_PROOF_SIGNATURE"||tampered==="CONTINUITY_HASH_MISMATCH")?"PASS":"FAIL"));
+console.log("RECEIPT_BINDING_CHECK="+(forged==="CONTINUITY_HASH_MISMATCH"||forged==="PROOF_BINDING_MISMATCH"?"PASS":"FAIL"));
+console.log("WITNESS_RECEIPT_MODEL_RESULT="+([valid==="RECEIPT_VALID",tampered!=="RECEIPT_VALID",forged!=="RECEIPT_VALID"].every(Boolean)?"PASS":"FAIL"));

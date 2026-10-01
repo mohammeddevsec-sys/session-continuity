@@ -1,0 +1,52 @@
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
+import crypto from "node:crypto";
+import { provisionSigningAuthority } from "../../src/evidence/signing-authority.js";
+import { createBindingKey, createSignedPresentation } from "../../src/core/proof-of-possession.js";
+import { createSecureSessionState, issueChallenge } from "../../src/core/durable-secure-session-state.js";
+import { createDurableTrustStore } from "../../src/evidence/durable-trust-store.js";
+import { createOidcSessionAnchor } from "../../src/adapters/oidc-session-adapter.js";
+import { executeSessionContinuityDecision } from "../../src/product/session-continuity-decision.js";
+import { verifySessionProvenanceReceipt } from "../../src/evidence/session-provenance-receiver.js";
+
+const root=fs.mkdtempSync(path.join(os.tmpdir(),"real-continuity-chain-"));
+const source=path.join(root,"source");
+const portable=path.join(root,"portable");
+fs.mkdirSync(source,{recursive:true});
+fs.mkdirSync(portable,{recursive:true});
+const authority=provisionSigningAuthority(path.join(source,"authority"),{label:"real-chain"});
+const trust=createDurableTrustStore(authority.trustRoot);
+const state=createSecureSessionState(path.join(source,"session-state"),60000);
+const key=createBindingKey();
+const claims={sub:"chain-user",iss:"https://issuer.example",sid:"chain-session",auth_time:"2026-09-15T03:00:00.000Z",aud:"chain-client"};
+const anchorBase=createOidcSessionAnchor({verifiedClaims:claims,clientId:"chain-client",deviceId:"device-A"});
+const anchor={...anchorBase,publicKeySpkiBase64:key.publicKeySpkiBase64,publicKeyFingerprintSha256:key.publicKeyFingerprint};
+const H=x=>crypto.createHash("sha256").update(JSON.stringify(x)).digest("hex");
+const witness={root:H({anchor}),head:null,receipts:[]};
+const submitWitness=(certificate)=>{const proofHash=H(certificate);const sequence=certificate.sequence;if(!witness.head){if(sequence!==1)return "FIRST_SEQUENCE_REQUIRED";witness.head={sequence,proofHash};witness.receipts.push({sequence,proofHash});return "REGISTERED";}if(sequence<witness.head.sequence)return "ROLLBACK";if(sequence===witness.head.sequence)return proofHash===witness.head.proofHash?"IDEMPOTENT_REPLAY":"EQUIVOCATION_FORK";if(sequence!==witness.head.sequence+1)return "SEQUENCE_GAP";witness.head={sequence,proofHash};witness.receipts.push({sequence,proofHash});return "ADVANCED";};
+async function accept(sequence){const now=Date.now();const ts=new Date(now).toISOString();const ch=issueChallenge(state,anchor.sessionId,now,60000);const signed=createSignedPresentation(key,{session_id:anchor.sessionId,subject:anchor.subject,issuer:anchor.issuer,client_id:anchor.clientId,device_id:"device-A",sequence,challenge:ch.challenge,timestamp:ts});return executeSessionContinuityDecision({anchor,durableState:state,presented:{sessionId:anchor.sessionId,subject:anchor.subject,issuer:anchor.issuer,clientId:anchor.clientId,deviceId:"device-A",sequence},signedPresentation:signed,timestamp:ts,nowMs:now,signingIdentity:authority.signer,durableTrustStore:trust,outputRoot:path.join(source,"proof-"+sequence)});}
+const p1=await accept(1); const w1=submitWitness(p1.provenanceCertificate);
+const p2=await accept(2); const w2=submitWitness(p2.provenanceCertificate);
+const p3=await accept(3); const w3=submitWitness(p3.provenanceCertificate);
+if(p1.decision!=="ALLOW"||p2.decision!=="ALLOW"||p3.decision!=="ALLOW")throw new Error("CHAIN_PRODUCT_DECISION_FAILED");
+for(const n of [1,2,3]){const dir=path.join(source,"proof-"+n);fs.cpSync(path.join(dir,"bundle"),path.join(portable,"proof-"+n+"-bundle"),{recursive:true});fs.cpSync(path.join(dir,"lineage"),path.join(portable,"proof-"+n+"-lineage"),{recursive:true});fs.writeFileSync(path.join(portable,"proof-"+n+"-policy.json"),JSON.stringify([p1,p2,p3][n-1].policy,null,2),"utf8");}
+fs.cpSync(path.join(source,"authority","trust"),path.join(portable,"trust"),{recursive:true});
+fs.writeFileSync(path.join(portable,"witness-receipts.json"),JSON.stringify({root:witness.root,receipts:witness.receipts},null,2),"utf8");
+fs.writeFileSync(path.join(portable,"certificates.json"),JSON.stringify([p1.provenanceCertificate,p2.provenanceCertificate,p3.provenanceCertificate],null,2),"utf8");
+fs.rmSync(source,{recursive:true,force:true});
+const portableTrust=createDurableTrustStore(path.join(portable,"trust"));
+const certs=JSON.parse(fs.readFileSync(path.join(portable,"certificates.json"),"utf8"));
+const receipts=JSON.parse(fs.readFileSync(path.join(portable,"witness-receipts.json"),"utf8"));
+const verified=[];
+for(let i=0;i<3;i++){const n=i+1;const cert=certs[i];const policy=JSON.parse(fs.readFileSync(path.join(portable,"proof-"+n+"-policy.json"),"utf8"));const r=verifySessionProvenanceReceipt({certificate:cert,durableTrustStore:portableTrust,bundleDir:path.join(portable,"proof-"+n+"-bundle"),lineageDir:path.join(portable,"proof-"+n+"-lineage"),policyDecision:policy,expectedSessionId:cert.session_id,expectedSubject:cert.subject,expectedIssuer:cert.issuer});const receipt=receipts.receipts[i];const proofHash=H(cert);verified.push(r.verified&&receipt.sequence===cert.sequence&&receipt.proofHash===proofHash);}
+console.log("=== REAL SESSION CONTINUITY CHAIN :: V1 ===");
+console.log("P1="+p1.decision+"|WITNESS="+w1);
+console.log("P2="+p2.decision+"|WITNESS="+w2);
+console.log("P3="+p3.decision+"|WITNESS="+w3);
+console.log("CHAIN_SEQUENCE="+certs.map(x=>x.sequence).join("->"));
+console.log("SOURCE_APP_STATE=DELETED");
+console.log("INDEPENDENT_PROOFS="+verified.map(x=>x?"PASS":"FAIL").join("|"));
+console.log("FULL_CHAIN_VERIFIED="+(verified.every(Boolean)&&witness.receipts.length===3?"PASS":"FAIL"));
+console.log("HISTORICAL_CHAIN_RESULT="+(verified.every(Boolean)&&witness.receipts.length===3?"PASS":"FAIL"));
+fs.rmSync(root,{recursive:true,force:true});

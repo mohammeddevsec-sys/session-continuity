@@ -1,0 +1,8 @@
+{
+  "verified": true,
+  "sub": "user-demo-001",
+  "iss": "https://issuer.example",
+  "sid": "sid-demo-001",
+  "auth_time": "2026-09-13T21:00:00.000Z",
+  "aud": "client-demo"
+}

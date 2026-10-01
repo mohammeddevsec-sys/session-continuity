@@ -1,0 +1,17 @@
+{
+  "schema_id": "session-continuity.session-provenance-certificate.v1",
+  "version": 1,
+  "session_id": "sid-revocation-001",
+  "subject": "user-revocation-001",
+  "issuer": "https://issuer.example",
+  "decision": "ALLOW",
+  "policy_fingerprint_sha256": "0edbf5fb6f346d10afed49c2e6c490d497a498d442ec21b6dfc52152b0db3595",
+  "bundle_root_sha256": "e5a980201117264a72776c240977a78d5a65418920b62438cd90be785464e73b",
+  "lineage_root_sha256": "2a5601f21654c7ae759a8fba0097f410b35587d936bf7a121adad8a29036684a",
+  "merkle_root_sha256": "10f4d181cd7a3c8f1db338eceda8a8d504d649ee1153401c52f44994a18ab443",
+  "evidence_fingerprint_sha256": "5f0573a1913c2edb4a56f17cb36d6430a561d914d721d99cd08433ce6c599088",
+  "sequence": 1,
+  "signer_public_key_fingerprint_sha256": "22e2f8fc8fc73d4a1b6950b20567849d4dc591328c68eba1ea999249a5a92e67",
+  "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAiiSIiAbX9Py2HziDXUVjsu+vbTTvBwCR/nhV62wcQzI=",
+  "signature_base64": "j3BNgNgZ22kdSd06MmgnsMArRnqn513IC0fhwgPH3e1ipdrJKRMsm4zhwwBL0niOi++eCYlp4bwcsX9+jS1xCg=="
+}

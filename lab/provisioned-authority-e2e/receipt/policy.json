@@ -1,0 +1,14 @@
+{
+  "schema_id": "session-continuity.policy-decision.v1",
+  "version": 1,
+  "decision": "ALLOW",
+  "reason": "SESSION_CONTINUITY_PROVEN",
+  "engine_decision": "CONTINUOUS",
+  "engine_reason": "SECURE_CONTINUITY_COMMITTED",
+  "committed": true,
+  "certificate_present": true,
+  "binding_valid": true,
+  "offline_verified": true,
+  "trusted_verified": true,
+  "policy_fingerprint_sha256": "0edbf5fb6f346d10afed49c2e6c490d497a498d442ec21b6dfc52152b0db3595"
+}

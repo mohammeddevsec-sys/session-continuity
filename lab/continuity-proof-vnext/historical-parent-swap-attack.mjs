@@ -1,0 +1,17 @@
+import crypto from "node:crypto";
+const H=x=>crypto.createHash("sha256").update(JSON.stringify(x)).digest("hex");
+const makeCert=(n,state)=>({session_id:"S1",subject:"U1",issuer:"I1",sequence:n,state_hash:H(state),decision:"ALLOW",lineage_root_sha256:H({n,state}),merkle_root_sha256:H(["M",n,state])});
+const p1=makeCert(1,{device:"D1"});
+const p2=makeCert(2,{device:"D1"});
+const p2Alt=makeCert(2,{device:"ATTACKED"});
+const p3=makeCert(3,{device:"D1"});
+const witness={1:H(p1),2:H(p2),3:H(p3)};
+const chainValid=H(p1)===witness[1]&&H(p2)===witness[2]&&H(p3)===witness[3];
+const swappedChain=H(p1)===witness[1]&&H(p2Alt)===witness[2]&&H(p3)===witness[3];
+console.log("=== HISTORICAL PARENT SWAP ATTACK ===");
+console.log("ORIGINAL_CHAIN="+(chainValid?"VALID":"INVALID"));
+console.log("P2_REPLACED="+(H(p2Alt)!==H(p2)?"YES":"NO"));
+console.log("SWAPPED_CHAIN_ACCEPTED="+(swappedChain?"YES":"NO"));
+console.log("CURRENT_SYSTEM_EXPECTED=NO_PARENT_BINDING_FIELD");
+console.log("ATTACK_STATUS="+(swappedChain?"FAIL":"PASS"));
+console.log("NOTE=This test intentionally models parent binding absence; PASS means the model rejected the swap, FAIL means the model still accepts independent valid certificates.");

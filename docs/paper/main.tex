@@ -1,0 +1,741 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{longtable}
+\usepackage{array}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue,
+  urlcolor=blue,
+  citecolor=blue,
+  pdftitle={Session Continuity Evidence: A Protocol for Verifiable Session Provenance},
+  pdfauthor={Mohammed N.Zomam}
+}
+
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  showstringspaces=false
+}
+
+\title{Session Continuity Evidence: A Protocol for Verifiable Session Provenance}
+
+\author{Mohammed N.Zomam\\ \texttt{nono\_gate@zohomail.com}}
+
+\date{September 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Modern identity and access management systems authenticate users and issue session tokens, but they do not produce durable cryptographic evidence that a later accepted session is the legitimate continuation of an earlier authenticated session. After a security incident, an auditor, an incident-response team, or a regulator cannot independently verify whether the accepted session chain is intact, was forked, was truncated, or was rebuilt by an attacker. Existing mechanisms---JWT, OAuth 2.0 session tokens, Proof of Possession, and Continuous Access Evaluation---address adjacent problems but do not produce portable, independently verifiable evidence of session continuity.
+
+This paper presents Session Continuity Evidence (SCE), a vendor-neutral protocol that establishes cryptographic continuity from a trusted authenticated session root through an ordered proof chain, durable witness observations, and independently verifiable portable evidence. The protocol separates the local acceptance decision from a durable witness that detects equivocation, and it packages the evidence so that a third party can verify the chain offline without access to the source application, the live witness, or the network.
+
+We describe the protocol, present a reference implementation consisting of nine modules with zero external runtime dependencies, and evaluate its correctness, adversarial resistance, performance, and package manifest. The reference implementation passes 251 named audit checks across twenty independent probes, including a 41-test v1 regression suite and twelve v1.1 conformance probes. It produces byte-identical output across independent processes, matches RFC 8032 Ed25519 golden vectors byte-for-byte, builds a 1{,}000-proof chain in 71~ms, and verifies it in 130~ms. The protocol does not claim first-in-world status, universal non-equivocation, legal admissibility, or replacement of existing IAM systems. Its contribution is a precise, tested, and openly specified construction that fills a documented gap in session provenance.
+\end{abstract}
+
+\section{Introduction}
+
+\subsection{The Problem}
+
+Authentication systems answer one question well: ``Is this principal who they claim to be at the moment of authentication?'' They answer a second question poorly: ``Is this later accepted session the legitimate continuation of that authenticated session?''
+
+Consider a scenario. A user authenticates to an application at time $T_0$. The application issues a session token. Over the next several hours, the user performs sensitive actions. At time $T_5$, a security incident is reported. Investigators want to know whether the session that performed each action was a legitimate continuation of the session that began at $T_0$, or whether an attacker inserted themselves into the chain at some point.
+
+Existing mechanisms do not provide portable evidence. A JWT carries a signature over a fixed set of claims, but it does not encode its position in a chain. An OAuth 2.0 refresh-token rotation scheme provides replay resistance within a single issuer, but it does not produce evidence that a third party can verify independently. Continuous Access Evaluation protocols dynamically adjust access, but they produce operational logs, not cryptographic proofs. Proof of Possession binds a token to a key, but it does not bind a token to a chain of prior tokens.
+
+The gap is precise: no existing protocol produces a portable artifact that a third party can verify to establish that a session that ended at $T_n$ was the continuation of a session that began at $T_0$.
+
+\subsection{Contribution}
+
+This paper makes four contributions.
+
+First, we specify a protocol, Session Continuity Evidence (SCE), that produces exactly such an artifact. The protocol consists of a continuity root, an ordered proof chain, a durable witness that detects equivocation, a portable evidence package, and a key lifecycle that distinguishes active, retired, and revoked keys while preserving historical verifiability.
+
+Second, we provide a normative reference implementation in the form of nine JavaScript modules with zero external runtime dependencies. The implementation is deterministic: two consecutive runs of the same input produce byte-identical output.
+
+Third, we evaluate the implementation. It passes 251 named audit checks across twenty independent probes, including a 41-test v1 regression suite and twelve v1.1 conformance probes. It matches RFC 8032 Ed25519 golden vectors byte-for-byte, builds a 1{,}000-proof chain in 71~ms and verifies it in 130~ms, declares the reference package as a private \texttt{session-continuity-engine@0.2.0} package, and rejects thirty-four categories of adversarial input across chain, witness, package, and key-lifecycle layers.
+
+Fourth, we publish the specification, the reference implementation, and the test vectors so that any third party can reproduce the results. The reference implementation is preserved alongside the existing v1 production namespace without any modification to the v1 contract.
+
+\subsection{Organization}
+
+Section~2 reviews related work. Section~3 defines the threat model and assumptions. Section~4 presents the protocol. Section~5 describes the reference implementation. Section~6 reports evaluation results. Section~7 discusses design decisions. Section~8 states limitations and future work. Section~9 concludes.
+
+\section{Background and Related Work}
+
+\subsection{Identity and Access Management}
+
+OpenID Connect (OIDC) specifies a layered identity protocol on top of OAuth~2.0. It defines ID tokens, UserInfo endpoints, and session management, but it does not define a portable artifact that binds successive session decisions into a verifiable chain.
+
+Security Assertion Markup Language (SAML) provides federation and single sign-on. Like OIDC, SAML produces signed assertions about authentication events but does not produce a chain of evidence across a session lifetime.
+
+OAuth~2.0 defines token issuance, refresh, and revocation. Refresh-token rotation provides replay resistance, but the evidence of rotation is held by the authorization server, not published in a form that a third party can independently verify.
+
+\subsection{Transparency Logs}
+
+Certificate Transparency (RFC~9162) introduced the concept of an append-only Merkle tree log for X.509 certificates. It solved a specific problem: detecting misissuance by certificate authorities. Its core ideas---immutable append-only logs, Merkle inclusion proofs, monitors, and auditors---are directly relevant to session provenance, but CT operates on certificates that have long validity periods, not on session events that occur at high frequency within a single application.
+
+Supply Chain Integrity, Transparency, and Trust (SCITT, RFC~9943) generalizes the CT model to signed statements about supply chain artifacts. SCITT defines an architecture, not a session-specific protocol.
+
+CONIKS and similar key-transparency systems apply the CT model to public-key directories. They solve the directory-equivocation problem, not the session-chain problem.
+
+\subsection{Token Binding and Proof of Possession}
+
+Proof of Possession (PoP) binds a token to a cryptographic key held by the client. It prevents token theft in transit but does not bind a token to a chain of prior tokens.
+
+Macaroons and Biscuit tokens encode authorization attenuation in a cryptographic structure. They allow a bearer to restrict capabilities, but they do not produce evidence about the order of issuance.
+
+PASETO (Platform-Agnostic Security Tokens) is a secure alternative to JWT. It provides authenticated encryption and versioning. It does not address session chaining.
+
+\subsection{Related Standards}
+
+RFC~8785 specifies the JSON Canonicalization Scheme (JCS), which we adopt for canonical serialization. RFC~8032 specifies EdDSA including Ed25519, which we adopt for signing. RFC~3161 specifies trusted timestamps, which a deployment may use to add a third-party time anchor.
+
+NIST Special Publication 800-63B provides guidance on digital identity, including session management. It recommends binding sessions to cryptographic secrets but does not specify a chain of evidence.
+
+None of the reviewed standards or systems produce a portable, independently verifiable artifact that proves session continuity. This is the gap SCE addresses.
+
+\section{Threat Model and Assumptions}
+
+\subsection{Adversary Capabilities}
+
+We assume a Dolev-Yao adversary with the following capabilities:
+
+\begin{itemize}
+\item The adversary may read, modify, delay, delete, reorder, or replay any message between any two principals.
+\item The adversary may present different valid proofs to different verifiers (equivocation).
+\item The adversary may attempt to corrupt durable witness state.
+\item The adversary may attempt to compromise signing keys or witness keys.
+\end{itemize}
+
+We assume the adversary does NOT have the following capabilities:
+
+\begin{itemize}
+\item The adversary cannot forge an Ed25519 signature without the corresponding private key.
+\item The adversary cannot find a SHA-256 collision.
+\item The adversary cannot extract a private key from a correctly implemented hardware security module.
+\end{itemize}
+
+\subsection{Trust Assumptions}
+
+The protocol assumes the following trust configuration:
+
+\begin{itemize}
+\item A deployment has established at least one continuity root through an authenticated session establishment process. Root establishment is a deployment trust boundary, not a protocol property.
+\item A deployment has configured one or more witness trust domains, each identified by a witness domain identifier and a witness public key.
+\item A deployment has published signer trust material and witness trust material in a form that independent verifiers can obtain.
+\end{itemize}
+
+\subsection{Non-Claims}
+
+The protocol explicitly does not claim:
+
+\begin{itemize}
+\item First-in-world status. Transparency logs, witness-based non-equivocation, and proof chains all exist in prior systems. The contribution is their composition for session continuity, not the invention of any single mechanism.
+\item Universal non-equivocation. A witness establishes non-equivocation only within its configured witness trust domain.
+\item Proof of legitimacy of the original authentication. The protocol proves continuity from a trusted root, not that the root was legitimately established.
+\item Proof of device ownership, absence of credential compromise, or correctness of the original identity assertions.
+\item Legal admissibility in any jurisdiction.
+\item Replacement of IAM, OIDC, CAEP, or session-risk systems.
+\end{itemize}
+\section{Protocol Design}
+
+\subsection{Overview}
+
+The protocol produces evidence of session continuity across five layers: a continuity root, an ordered proof chain, a durable witness, a portable evidence package, and a key lifecycle. Each layer has a distinct responsibility and a distinct trust boundary.
+
+The continuity root establishes the authenticated session context. Each proof in the chain commits to the previous proof and to a decision made by the source application. A durable witness independently observes each proof and signs a receipt. The receipts and proofs are packaged together with trust material, so a third party can verify the chain offline without contacting the source application, the witness, or the network. The key lifecycle governs active, retired, and revoked keys and preserves the verifiability of historical proofs.
+
+\subsection{Continuity Root}
+
+A continuity root is derived from an authenticated session root object. The root object binds at minimum: a session identifier, a subject, an issuer, an authentication time, and a client context. The root object is immutable once established. The continuity root value is computed as a SHA-256 over the canonical serialization of the root object.
+
+The protocol deliberately does not specify how the root object is authenticated. Root establishment is a deployment trust boundary. A verifier that trusts a continuity root has made an external trust decision; the protocol does not manufacture that trust.
+
+\subsection{Proof Object}
+
+Each proof is a JSON object with the following fields:
+
+\begin{itemize}
+\item \texttt{schema} --- fixed string \texttt{continuity-proof.v1.1}.
+\item \texttt{continuity\_root} --- 64-hex continuity root value.
+\item \texttt{sequence} --- positive integer, starting at 1.
+\item \texttt{parent\_hash} --- JSON null at sequence 1, otherwise the \texttt{continuity\_hash} of the immediately preceding proof.
+\item \texttt{state\_hash} --- 64-hex commitment to application state.
+\item \texttt{decision\_hash} --- 64-hex commitment to the local decision.
+\item \texttt{issued\_at} --- RFC~3339 UTC timestamp with exactly three fractional digits and uppercase \texttt{Z}.
+\item \texttt{signer\_key\_id} --- stable identifier for the signing key.
+\item \texttt{policy\_fingerprint\_sha256} --- 64-hex commitment to the decision policy.
+\item \texttt{continuity\_hash} --- SHA-256 over the canonical serialization of the proof core (all fields except \texttt{continuity\_hash}).
+\end{itemize}
+
+The proof signature covers the complete canonical proof body including \texttt{continuity\_hash}. The signature is Ed25519.
+
+\subsection{Canonical Serialization}
+
+The protocol uses the JSON Canonicalization Scheme (JCS, RFC~8785) for canonical serialization of the proof core. The V1.1 profile adds strict restrictions beyond JCS itself: \texttt{-0} is rejected, \texttt{NaN} and \texttt{Infinity} are rejected, lone surrogate code units are rejected, and object prototype must be \texttt{Object.prototype} or \texttt{null}. These restrictions are not part of RFC~8785; they are profile-specific and are stated explicitly so that independent implementations converge.
+
+Implementations MUST NOT apply additional Unicode normalization. Protocol counters MUST be JSON integers.
+
+\subsection{Sequence Guard}
+
+The sequence value is the authoritative continuity order. A new accepted sequence MUST equal $\mathrm{lastAcceptedSequence} + 1$.
+
+\begin{itemize}
+\item A lower sequence MUST be rejected as \texttt{SEQUENCE\_ROLLBACK}.
+\item An equal sequence with the same \texttt{continuity\_hash} MAY be treated as \texttt{IDEMPOTENT\_REPLAY}.
+\item An equal sequence with a different \texttt{continuity\_hash} MUST be treated as \texttt{EQUIVOCATION\_FORK} by a witness.
+\item A greater sequence MUST be rejected as \texttt{SEQUENCE\_GAP}.
+\end{itemize}
+
+The sequence guard is implemented in two forms: an in-memory guard for tests, and a durable guard that persists accepted sequences to a crash-safe journal with an authoritative head. The durable guard reconstructs and validates the head on restart before accepting new proofs.
+
+\subsection{Parent Binding}
+
+A verifier MUST verify the immediately preceding proof before accepting proof $n$. Sequence numbers alone MUST NOT establish parentage. Missing, substituted, or unverifiable parent material MUST cause rejection. An isolated proof MUST NOT be reported as \texttt{CONTINUITY\_PROVEN} merely because its signature and commitments are individually valid.
+
+\subsection{Durable Witness}
+
+A witness maintains durable state per \texttt{continuity\_root} and \texttt{witness\_domain\_id}. For each observed proof, the witness records the \texttt{continuity\_hash} and \texttt{proof\_hash}. When the same \texttt{continuity\_root} and \texttt{sequence} are observed with a different \texttt{continuity\_hash}, the witness classifies the event as \texttt{EQUIVOCATION\_FORK} and emits a signed receipt.
+
+The witness uses a write-ahead journal with a head record. The head is validated on every operation. If recovery fails, the witness fails closed: it refuses new proofs and refuses to emit new receipts. Read-only verification of historical receipts remains available. The witness writes its state using atomic file replacement to ensure that a crash resolves to either a committed receipt or no accepted state.
+
+\subsection{Witness Receipt}
+
+A witness receipt binds: \texttt{continuity\_root}, \texttt{sequence}, observed \texttt{proof\_hash}, \texttt{continuity\_hash}, \texttt{witness\_head\_sequence}, \texttt{witness\_head\_hash}, \texttt{witness\_domain\_id}, \texttt{witness\_key\_id}, and \texttt{issued\_at}. The receipt is signed by the witness key, which is distinct from any signer key used to sign proofs. This separation ensures that compromise of a signer key does not enable receipt forgery.
+
+Receipt verification requires only the witness public key. It does not require contacting the witness.
+
+\subsection{Witness Equivocation Evidence}
+
+Witness equivocation is externally provable when two validly signed witness receipts share the same \texttt{witness\_domain\_id}, the same \texttt{witness\_key\_id}, the same \texttt{continuity\_root}, and the same \texttt{sequence}, but contain different \texttt{continuity\_hash} values. The two receipts together constitute evidence of equivocation and are verifiable without trusting the witness to report its own misbehavior.
+
+Cross-witness-domain observations do NOT constitute global equivocation. Two receipts from different witness domains that disagree on a continuity value prove only that the domains observed different states. A global non-equivocation claim requires an explicitly defined common trust or aggregation domain beyond the scope of this protocol.
+
+\subsection{Key Lifecycle}
+
+Every signing and witness identity has a stable key identifier. Key state distinguishes three values: \texttt{ACTIVE}, \texttt{RETIRED}, and \texttt{REVOKED}.
+
+\begin{itemize}
+\item \texttt{ACTIVE} keys may sign new proofs and new receipts.
+\item \texttt{RETIRED} keys may not sign new proofs, but proofs issued before retirement remain cryptographically verifiable.
+\item \texttt{REVOKED} keys may not sign new proofs, and proofs issued after the effective revocation point are rejected.
+\end{itemize}
+
+A deployment MAY additionally define a compromise window $[\mathrm{start}, \mathrm{end}]$ associated with a revoked key. Proofs whose \texttt{issued\_at} falls within the compromise window are rejected regardless of signature validity. Proofs issued before the compromise window remain historically valid.
+
+Cryptographic signature validity and compromise disposition are separate concepts. A key compromise declaration MUST NOT retroactively rewrite historical signatures.
+
+\subsection{Portable Evidence Package}
+
+A portable evidence package is a JSON object that contains: package schema and version, continuity root, the ordered proof chain, witness receipts, signer trust material, witness trust material, policy references, and a package signature. The package is signed by a packager key, which is distinct from both the signer key and the witness key.
+
+The package signature protects package authenticity. It MUST NOT substitute for verification of the contained evidence. The independent verifier MUST verify: the package signature, the continuity root, the proof chain, every proof signature, every witness receipt, the trust anchors, and the policy bindings. The verifier distinguishes the following states: \texttt{PACKAGE\_AUTHENTIC}, \texttt{EVIDENCE\_VALID}, \texttt{WITNESS\_EVIDENCE\_VALID}, \texttt{POLICY\_VALID}, \texttt{CONTINUITY\_PROVEN}, and \texttt{CONTINUITY\_COMPLETE}.
+
+\subsection{Completeness and Truncation}
+
+A valid prefix MUST NOT be interpreted as the complete history. \texttt{PREFIX\_VALID} proves only the supplied interval. \texttt{CONTINUITY\_COMPLETE} requires independent finality evidence, such as a trusted final checkpoint or an explicit session-closure statement bound to the final continuity hash. \texttt{chain\_length} alone MUST NOT establish completeness.
+
+\section{Reference Implementation}
+
+\subsection{Structure}
+
+The reference implementation consists of nine JavaScript modules, organized as four core modules and five evidence modules. The implementation has zero external runtime dependencies beyond the Node.js standard library.
+
+Core modules:
+
+\begin{itemize}
+\item \texttt{canonical-v1\_1.js} --- JCS profile with V1.1 restrictions.
+\item \texttt{continuity-proof-v1\_1.js} --- proof construction and chain verification.
+\item \texttt{sequence-guard-v1\_1.js} --- in-memory exact-sequence verification.
+\item \texttt{durable-sequence-guard-v1\_1.js} --- durable sequence journal with crash safety.
+\end{itemize}
+
+Evidence modules:
+
+\begin{itemize}
+\item \texttt{proof-signature-v1\_1.js} --- Ed25519 signer and verifier.
+\item \texttt{trusted-proof-verifier-v1\_1.js} --- trusted chain verification with key-lifecycle integration.
+\item \texttt{witness-v1\_1.js} --- durable witness with equivocation detection and fail-closed recovery.
+\item \texttt{portable-package-v1\_1.js} --- package builder and verifier.
+\item \texttt{key-lifecycle-v1\_1.js} --- active, retired, and revoked key state machine.
+\end{itemize}
+
+\subsection{Source-Tree Digest}
+
+The reference tree digest at publication is:
+
+\begin{lstlisting}
+SRC_TREE_SHA256 = 941DE3DAC25B80B82D8ECC38D6A1C3F8F0BE085205A1AC339E2CB99D3CD7DE5F
+\end{lstlisting}
+
+The digest is computed by hashing the lexicographically ordered list of relative file paths and file contents under \texttt{src/}, excluding any file whose name contains \texttt{.backup\_}, into a single SHA-256.
+
+\subsection{Determinism}
+
+The reference implementation is deterministic. Two consecutive runs of the reference test harness \texttt{lab/PROOF.mjs} produce byte-identical output:
+
+\begin{lstlisting}
+PROOF_RUN_SHA256 = 48FF8147BEADE14AA74697B70532185DF276100B592676DC06E769F4C40B12C5
+\end{lstlisting}
+
+The determinism property is verified by an explicit check within \texttt{PROOF.mjs} that compares the SHA-256 of two independent runs.
+
+\subsection{Coexistence with v1}
+
+The reference implementation preserves the existing v1 production namespace \texttt{session-continuity.proof-certificate.v1} without modification. The v1 regression suite of 41 tests continues to pass. The v1.1 modules live under distinct filenames and are not imported by any v1 module. The two namespaces coexist.
+
+\subsection{Diagnostic Output}
+
+The reference implementation attaches a diagnostic envelope to each decision result. The envelope contains four fields: \texttt{reason\_code}, \texttt{failure\_stage}, \texttt{failure\_location}, and \texttt{evidence\_ref}.
+
+These fields are attached to the decision envelope and are not part of the cryptographic proof core. They do not enter \texttt{decision\_hash} or \texttt{continuity\_hash}, and they do not alter the v1 or v1.1 contract semantics. Their purpose is operational: they allow a caller to distinguish between a replay failure, a continuity failure, a challenge failure, a proof-of-possession failure, and other rejection classes without requiring out-of-band knowledge.
+
+The diagnostic envelope is covered by dedicated tests: \texttt{test/diagnostic-session-continuity.js} for the base decision categories, \texttt{test/diagnostic-challenge-branches.js} for the challenge rejection branches, and \texttt{test/diagnostic-reason-code-coverage.js} for a static coverage check that ensures future reason codes do not silently fall through to an unclassified state.
+\section{Evaluation}
+
+\subsection{Methodology}
+
+The current named evidence snapshot was produced by executing twenty reference probes against the reference tree digest listed in Section~5.2. The complete audit artifact is \texttt{lab/EVIDENCE-AUDIT.md} with SHA-256:
+
+\begin{lstlisting}
+883FEBE7E12F6966B8454A5B6DF232AD9BAD4C9F5A21A9207144D5E6DA83007A
+\end{lstlisting}
+
+Every check is named, and every probe's source SHA-256 is recorded so that the audit is independently reproducible.
+
+The current evidence snapshot covers 251 named checks across twenty probes. All 251 pass; zero fail.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{@{}llrr@{}}
+\toprule
+Probe & SHA-256 (16 hex) & Checks & PASS \\
+\midrule
+\texttt{PROOF.mjs} & \texttt{AAA12410D71AE898} & 11 & 11 \\
+\texttt{full-audit.mjs} & \texttt{5067FB2C21EEC8AB} & 32 & 32 \\
+\texttt{regression-gate} & \texttt{7F768D6C0CD52A69} & 13 & 13 \\
+\texttt{integration-probe} & \texttt{7E5D75E73C4FB49F} & 6 & 6 \\
+\texttt{chain-probe} & \texttt{13171C3E12FB91DC} & 7 & 7 \\
+\texttt{scale-chain-probe} & \texttt{C9CA5E0AF62DF0D5} & 2 & 2 \\
+\texttt{trusted-chain-probe} & \texttt{AB03B5DDFDBCF02D} & 7 & 7 \\
+\texttt{sequence-guard-probe} & \texttt{8404094B0968236E} & 9 & 9 \\
+\texttt{durable-sequence-probe} & \texttt{62C83E94CDC5121E} & 22 & 22 \\
+\texttt{witness-probe-v2} & \texttt{CD3082A01778769D} & 13 & 13 \\
+\texttt{witness-fail-closed} & \texttt{12560BB48D0A7959} & 10 & 10 \\
+\texttt{portable-package-v2} & \texttt{C30031CDD6D81797} & 9 & 9 \\
+\texttt{full-integration} & \texttt{1CD85A7F5036AF72} & 25 & 25 \\
+\texttt{key-lifecycle} & \texttt{D9A010C51C6F4DE5} & 28 & 28 \\
+\texttt{lifecycle-integration} & \texttt{4A87EEABFCE2D80D} & 7 & 7 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Correctness}
+
+Named checks verifying that the reference implementation behaves as the protocol specifies. Every check below is produced by the probe listed in its row. Probe SHA-256 values are in Section~6.1. Reproduction: run the probe from the repository root; the same check name and the same result will appear in the output.
+
+{\small
+\begin{longtable}{@{}p{4.5cm}p{4cm}p{6cm}@{}}
+\toprule
+Check & Probe & What It Verifies \\
+\midrule
+\endhead
+\texttt{IDENTITY\_CREATED} & integration-probe & Ed25519 identity creation \\
+\texttt{ROOT\_CREATED} & integration-probe & Continuity root derived from session root \\
+\texttt{CORE\_CREATED} & integration-probe & Proof core constructed with schema \texttt{continuity-proof.v1.1} \\
+\texttt{HASH\_ADDED} & integration-probe & \texttt{continuity\_hash} added exactly once \\
+\texttt{SIGNED} & integration-probe & Proof signed with schema-bound payload \\
+\texttt{VERIFIED} & integration-probe & Signed proof verifies as \texttt{PROOF\_SIGNATURE\_VALID} \\
+\texttt{CHAIN\_VERIFY} & chain-probe & Three-proof chain verifies as \texttt{CONTINUITY\_PROVEN} \\
+\texttt{CHAIN\_HEAD} & chain-probe & Chain head equals final \texttt{continuity\_hash} \\
+\texttt{VERIFIED (100)} & scale-chain-probe & 100-proof chain verifies \\
+\texttt{HEAD\_MATCH} & scale-chain-probe & Head matches expected value \\
+\texttt{J\_SCALE\_1000} & full-audit & 1{,}000-proof chain verifies \\
+\texttt{SEQ\_1..3} & full-integration & Exact sequence progression 1 to 3 \\
+\texttt{SEQ\_POST\_RESTART\_4} & full-integration & Sequence continues after restart \\
+\texttt{D\_RFC8032\_PUBLIC\_KEY} & full-audit & Matches RFC~8032 Section~7.1 Test~1 byte-for-byte \\
+\texttt{D\_RFC8032\_SIGNATURE} & full-audit & Matches RFC~8032 Section~7.1 Test~1 byte-for-byte \\
+\texttt{D\_RFC8032\_VERIFY} & full-audit & RFC~8032 Test~1 signature verifies \\
+\texttt{E\_NEGATIVE\_ZERO} & full-audit & \texttt{-0} rejected by canonical profile \\
+\texttt{E\_NAN} & full-audit & \texttt{NaN} rejected \\
+\texttt{E\_INFINITY} & full-audit & \texttt{Infinity} rejected \\
+\texttt{E\_LONE\_SURROGATE} & full-audit & Lone surrogate rejected \\
+\texttt{E\_RECURSIVE\_SORT} & full-audit & Recursive object sort correct \\
+\texttt{F\_V1\_UTF16\_ORDER} & full-audit & UTF-16 property ordering per RFC~8785 rules \\
+\texttt{F\_V1\_V11\_AGREE} & full-audit & v1 and v1.1 canonical functions agree \\
+\bottomrule
+\end{longtable}
+}
+
+\subsection{Adversarial Resistance}
+
+Named checks verifying that specific adversarial inputs are rejected with specific reasons.
+
+{\small
+\begin{longtable}{@{}p{5cm}p{4.5cm}p{5.5cm}@{}}
+\toprule
+Attack & Check & Reason \\
+\midrule
+\endhead
+Tampered decision commitment & \texttt{NC1} & \texttt{SIGNATURE\_INVALID} \\
+Tampered continuity hash & \texttt{NC2} & \texttt{SIGNATURE\_INVALID} \\
+Recomputed hash mismatch & \texttt{NC3} & \texttt{CONTINUITY\_HASH\_MISMATCH} \\
+Empty proof chain & \texttt{NC4} & \texttt{EMPTY\_CHAIN} \\
+Missing verifier function & \texttt{NC5} & \texttt{SIGNATURE\_VERIFIER\_REQUIRED} \\
+Wrong schema identifier & \texttt{NC6} & \texttt{CERTIFICATE\_INVALID} \\
+Chain tampered proof & \texttt{TAMPER\_REJECTED} & \texttt{SIGNATURE\_INVALID} \\
+Chain wrong parent & \texttt{WRONG\_PARENT} & \texttt{SIGNATURE\_INVALID} \\
+Chain sequence gap & \texttt{SEQUENCE\_GAP} & \texttt{SEQUENCE\_MISMATCH} \\
+Chain wrong root & \texttt{WRONG\_ROOT} & \texttt{ROOT\_NOT\_TRUSTED} \\
+Undeclared signer chain & \texttt{ATTACKER\_CHAIN} & \texttt{SIGNER\_NOT\_TRUSTED} \\
+Revoked signer & \texttt{REVOKED\_SIGNER} & \texttt{SIGNER\_REVOKED} \\
+Package tampered proof & \texttt{TAMPERED\_PROOF} & \texttt{PACKAGE\_CHAIN\_SIGNATURE\_INVALID} \\
+Package tampered receipt & \texttt{TAMPERED\_RECEIPT} & \texttt{PACKAGE\_WITNESS\_RECEIPT\_INVALID} \\
+Package fake packager & \texttt{FAKE\_PACKAGER} & \texttt{PACKAGE\_PACKAGER\_NOT\_TRUSTED} \\
+Package undeclared signer & \texttt{UNDECLARED\_SIGNER} & \texttt{PACKAGE\_PROOF\_SIGNER\_NOT\_DECLARED} \\
+Package wrong root & \texttt{WRONG\_ROOT\_DEEP} & \texttt{PACKAGE\_CHAIN\_ROOT\_NOT\_TRUSTED} \\
+Receipt binding mismatch & \texttt{RECEIPT\_BINDING} & \texttt{PACKAGE\_WITNESS\_RECEIPT\_INVALID} \\
+Witness same-domain fork & \texttt{SEQ1\_EQUIVOCATION} & \texttt{EQUIVOCATION\_FORK} \\
+Witness external proof & \texttt{SAME\_DOMAIN\_EQ} & \texttt{EQUIVOCATION\_FORK} \\
+Witness state corruption & \texttt{HEALTH\_CORRUPT} & \texttt{FAIL\_CLOSED} \\
+Witness refuses on corruption & \texttt{OBSERVE\_REJECTED} & \texttt{WITNESS\_STATE\_JSON\_INVALID} \\
+Sequence rollback & \texttt{SEQ\_ROLLBACK} & \texttt{SEQUENCE\_ROLLBACK} \\
+Durable journal rollback & \texttt{ROLLBACK\_DETECTED} & \texttt{HEAD\_HEIGHT\_MISMATCH} \\
+Durable journal corruption & \texttt{CORRUPTION\_DETECTED} & JSON parse error \\
+Post-retirement proof & \texttt{PROOF\_AFTER\_RETIRE} & \texttt{PROOF\_AFTER\_RETIREMENT} \\
+Compromise-window proof & \texttt{PROOF\_WITHIN\_COMPROMISE} & \texttt{PROOF\_WITHIN\_COMPROMISE\_WINDOW} \\
+Revoked signing attempt & \texttt{CAN\_SIGN\_REVOKED} & not allowed \\
+Lifecycle missing store & \texttt{NO\_LIFECYCLE} & \texttt{KEY\_LIFECYCLE\_STORE\_REQUIRED} \\
+Lifecycle unregistered key & \texttt{UNREGISTERED\_KEY} & \texttt{KEY\_NOT\_IN\_LIFECYCLE\_STORE} \\
+Lifecycle require-active-now & \texttt{REQUIRE\_ACTIVE\_NOW} & \texttt{KEY\_NOT\_ACTIVE\_NOW} \\
+\bottomrule
+\end{longtable}
+}
+
+\subsection{Performance}
+
+Measured on Windows~11 with Node.js~v24.8.0. Each measurement includes Ed25519 signature generation or verification per proof, canonical hash recomputation, exact sequence check, and parent-binding check. No network I/O is involved. The workload is purely local. Repeated runs produce the same results within measurement noise.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lrl@{}}
+\toprule
+Operation & Duration & Source \\
+\midrule
+Build 100-proof chain & 10~ms & scale-chain-probe \\
+Verify 100-proof chain & 13~ms & scale-chain-probe \\
+Build 1{,}000-proof chain & 71~ms & full-audit \\
+Verify 1{,}000-proof chain & 130~ms & full-audit \\
+Build per proof & 0.10~ms & derived \\
+Verify per proof & 0.13~ms & derived \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The protocol does not require Merkle acceleration at the tested 1{,}000-proof scale.
+
+\subsection{Package Manifest}
+
+The current reference package is identified from \texttt{package.json}. This section deliberately avoids a current compressed-size or file-count claim because no retained package artifact is available for independent remeasurement.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lll}
+\toprule
+Metric & Value & Source \\
+\midrule
+Package name/version & \texttt{session-continuity-engine@0.2.0} & \texttt{package.json} \\
+Private package & \texttt{true} & \texttt{package.json} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Reproducibility}
+
+Two consecutive runs of \texttt{lab/PROOF.mjs} produce byte-identical output. The reference digest is:
+
+\begin{lstlisting}
+PROOF_RUN_SHA256 = 48FF8147BEADE14AA74697B70532185DF276100B592676DC06E769F4C40B12C5
+\end{lstlisting}
+
+The source-tree digest at publication is:
+
+\begin{lstlisting}
+SRC_TREE_SHA256 = 941DE3DAC25B80B82D8ECC38D6A1C3F8F0BE085205A1AC339E2CB99D3CD7DE5F
+\end{lstlisting}
+
+A third party can reproduce the entire audit by executing \texttt{lab/EVIDENCE-CAPTURE.mjs}, which regenerates \texttt{lab/EVIDENCE-AUDIT.md} with SHA-256 \texttt{883FEBE7E12F6966B8454A5B6DF232AD9BAD4C9F5A21A9207144D5E6DA83007A}.
+
+\subsection{Evidence Gap Classification}
+
+This section classifies unverified or unimplemented aspects explicitly. Items are placed into one of three categories.
+
+\begin{itemize}
+\item \textbf{Scope Boundary} --- a claim the protocol intentionally does not make.
+\item \textbf{Assurance Gap} --- a property that could be added through further work and that matters for production deployment.
+\item \textbf{Feature Omission} --- an optional capability deliberately deferred.
+\end{itemize}
+
+{\small
+\begin{longtable}{@{}p{6.5cm}p{3cm}p{5cm}@{}}
+\toprule
+Category & Classification & Reason \\
+\midrule
+\endhead
+Complete RFC~8785 implementation conformance & Assurance Gap & Only selected V1.1 profile vectors tested \\
+Crash boundary injection at the state-write write/fsync/close/rename points is exercised by a dedicated probe; broader application-level commit-boundary fault injection remains outside tested scope \\
+Formal Tamarin/ProVerif proofs & Assurance Gap & No formal model exists \\
+Multi-implementation interoperability & Assurance Gap & One reference implementation only \\
+External security audit & Assurance Gap & No third-party audit performed \\
+Large-scale Merkle acceleration behavior & Feature Omission & Not required at tested scale \\
+Selective disclosure & Feature Omission & Not defined in V1.2; does not preclude future extension \\
+Global non-equivocation & Scope Boundary & Witness scope bounded by design \\
+Legal admissibility & Scope Boundary & No legal claim is made \\
+Proof of legitimacy of original authentication & Scope Boundary & Protocol proves continuity from a root, not root legitimacy \\
+Device ownership & Scope Boundary & Not addressed \\
+Absence of credential compromise & Scope Boundary & Not addressed \\
+\bottomrule
+\end{longtable}
+}
+
+\subsection{Closed Core Assurance Properties}
+
+The following properties are frequently cited as critical pre-conditions for session-continuity protocols. Each is closed in the reference implementation with named test evidence.
+
+{\small
+\begin{longtable}{@{}p{6cm}p{2cm}p{6cm}@{}}
+\toprule
+Property & Status & Evidence \\
+\midrule
+\endhead
+Crash consistency of durable state & CLOSED & \texttt{ROLLBACK\_DETECTED}, \texttt{CORRUPTION\_DETECTED}, \texttt{RECOVERY\_AFTER\_REPAIR} \\
+Independent verification offline & CLOSED & \texttt{portable-package-probe-v2} \\
+Authoritative conformance gate & CLOSED & \texttt{regression-gate.mjs} --- 13 checks \\
+Semantic test enforcement & CLOSED & \texttt{EVIDENCE-CAPTURE.mjs} --- 251 named checks \\
+Parent binding and sequence strictness & CLOSED & \texttt{CHAIN\_HEAD}, \texttt{SEQUENCE\_GAP}, \texttt{WRONG\_PARENT} \\
+\bottomrule
+\end{longtable}
+}
+
+Finality semantics (the distinction between a valid prefix and a complete history) is specified in the specification and exercised by dedicated P0 and reconciled integration probes. Closed-checkpoint finality is bound to the verified final head, while truncated prefixes remain incomplete.
+\section{Discussion}
+
+\subsection{Why Separate the Witness from the Signer}
+
+The reference implementation uses distinct key pairs for signing proofs, for signing witness receipts, and for signing portable packages. This separation has an operational cost: three key-management lifecycles, three trust anchors, and three sets of rotation policies. The benefit is that a single compromise does not collapse the entire protocol.
+
+If a signer key is compromised, an attacker can forge proofs. The attacker cannot forge witness receipts, because the witness key is separate. An auditor who holds a previously issued witness receipt can therefore detect that a new proof was not observed by the witness.
+
+If a witness key is compromised, an attacker can forge receipts. The attacker cannot forge proofs, because the signer key is separate. An auditor who verifies the proof chain independently can therefore detect that a receipt was issued without a corresponding proof event.
+
+If both a signer key and a witness key are compromised simultaneously, the protocol cannot detect the attack. This is a stated limitation, not a defense.
+
+\subsection{Why Bind Policy into the Proof}
+
+Each proof commits to a policy fingerprint. The fingerprint is the SHA-256 of the canonical serialization of the policy record used to produce the decision. This binding serves three purposes.
+
+First, it prevents silent policy change. A verifier that holds a proof can reconstruct which policy the application used, and can detect whether the current deployment policy differs from the policy that produced the proof.
+
+Second, it enables the separation of historical validity from current validity. A proof that was valid under a historical policy remains historically valid even if the current policy differs, provided the historical policy is still known.
+
+Third, it enables a future audit trail of policy transitions. A deployment that changes policy within the same continuity root must explicitly represent the transition, so that a verifier can distinguish between a proof issued under the old policy and a proof issued under the new policy.
+
+\subsection{Why All-or-Nothing Verification}
+
+Chain verification is all-or-nothing. A single invalid proof invalidates the entire chain from that point forward. The alternative, partial acceptance, would allow an attacker to substitute a valid prefix for the complete history.
+
+All-or-nothing verification has an operational cost: a corrupted byte in a single proof invalidates an entire chain. The cost is accepted because the alternative is a false-positive \texttt{CONTINUITY\_PROVEN} on a compromised chain. In session security, a false positive is more dangerous than a false negative.
+
+\subsection{Why Fail-Closed Recovery}
+
+If a durable witness detects state corruption, it enters a fail-closed mode. It refuses new proofs, refuses to emit new receipts, and reports its status. It does not attempt automatic repair.
+
+Automatic repair would require the witness to decide which pieces of its own state are corrupt and which are intact. In the absence of an external source of truth, this decision is unsafe. A witness that repairs itself may silently accept a state that a compromised attacker prepared.
+
+Fail-closed recovery forces the operator to intervene. The operator can restore the witness from a backup, or repair the journal manually, and then explicitly re-enable the witness. This is a deliberate trade-off of operational cost for security.
+
+\subsection{Why Sequence Instead of Merkle Trees at Current Scale}
+
+The protocol uses a linear parent chain rather than a Merkle tree. A linear chain requires $O(n)$ verification time. A Merkle tree would require $O(\log n)$ time but would add complexity in root derivation, proof construction, and package format.
+
+At the tested scale of 1{,}000 proofs, linear verification completes in 130~ms. At 10{,}000 proofs, linear verification completes in approximately 2.4 seconds in earlier laboratory tests. These are acceptable for offline verification of a session that has already ended.
+
+Merkle acceleration becomes worthwhile when the chain length exceeds tens of thousands of proofs, or when online verification latency is a hard constraint. The specification explicitly permits Merkle acceleration without altering parent-binding semantics.
+
+\subsection{Comparison with Certificate Transparency}
+
+The protocol borrows concepts from Certificate Transparency (RFC~9162): append-only logs, witness-based non-equivocation, and external verifiability. It is not a Certificate Transparency implementation and is not positioned as an improvement on it. The two address different problems with some overlapping mechanisms. The table below is descriptive, not evaluative. The remaining paragraphs describe three structural differences.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+Dimension & Certificate Transparency & Session Continuity Evidence \\
+\midrule
+Object & X.509 certificate & Session event \\
+Scope & Global per log & Per session \\
+Lifespan & Years & Hours to days \\
+Primary verifier & Public monitors & Internal auditors, incident response \\
+Trust model & Publicly verifiable & Domain-scoped witness trust \\
+Finality evidence & Inclusion proof, Signed Certificate Timestamp & Checkpoint and parent chain \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+First, the object being logged is a session event, not a certificate. Session events occur at much higher frequency than certificate issuance and have much shorter lifetimes.
+
+Second, the log is per-session, not global. A continuity chain is scoped to a single authenticated session. It is not aggregated across all sessions of an organization.
+
+Third, the verifier is typically an internal auditor or incident-response team, not a public monitor. The trust model is narrower than CT's public-monitor model.
+
+These differences do not invalidate the CT analogy. They define the scope in which the analogy holds.
+
+\section{Limitations and Future Work}
+
+This section organizes limitations by the same three-category classification used in Section~6.7. It also states explicitly which properties are closed and which are not.
+
+\subsection{Scope Boundaries}
+
+The protocol deliberately does not address the following. These are not gaps; they are design boundaries stated in Section~3.3.
+
+\begin{itemize}
+\item \textbf{Legitimacy of the original authentication.} The protocol assumes a trusted continuity root has already been established. It proves continuity from that root, not that the root was legitimately established.
+\item \textbf{Global non-equivocation.} A witness establishes non-equivocation only within its configured witness trust domain.
+\item \textbf{Device ownership.} The protocol does not verify that a specific device is being used.
+\item \textbf{Absence of credential compromise.} The protocol does not verify that credentials are uncompromised at the time of use.
+\item \textbf{Legal admissibility.} No legal claim is made in any jurisdiction.
+\item \textbf{Replacement of IAM.} The protocol supplements IAM; it does not authenticate users, issue identity tokens, or perform role-based access control.
+\end{itemize}
+
+\subsection{Assurance Gaps}
+
+The following properties are achievable with further work and matter for production deployment. Each is classified as an Assurance Gap in Section~6.7.
+
+\paragraph{Formal Verification Pending.} The protocol has not been formally verified with a tool such as Tamarin, ProVerif, or CryptoVerif. A formal verification effort would target \texttt{no\_sequence\_gap}, \texttt{parent\_binding\_soundness}, \texttt{witness\_non\_equivocation}, \texttt{historical\_consistency}, \texttt{replay\_resistance}, and \texttt{completeness\_soundness}. Each invariant would be stated as a lemma under explicit cryptographic assumptions. This is future work.
+
+\paragraph{External Security Audit Pending.} The reference implementation has not been audited by an external security firm. An external audit would review the source code for logic errors, timing side channels, memory safety issues, and implementation divergences from the specification. This is future work.
+
+\paragraph{Crash Boundary Injection Evidence.} The reference implementation uses atomic file replacement, \texttt{fsync}, and a head record to make state durable across crashes. A dedicated probe injects termination at the state-write \texttt{write}, \texttt{fsync}, \texttt{close}, and \texttt{rename} boundaries and verifies recovery, head preservation, and receipt/state consistency. Exhaustive fault injection across every possible application commit boundary beyond this storage-write path remains outside the tested scope. The retained execution artifact is \texttt{lab/CRASH-BOUNDARY-ASSURANCE-EVIDENCE.txt} with SHA-256 \texttt{2DE116F6B43970D27C48EB30A921FCAF07ECAB4CAF67B1F82FDCAD9593B2960A}.
+
+\paragraph{Multi-Implementation Interoperability Pending.} Only one reference implementation exists. Independent implementations in other languages would strengthen the evidence for interoperability. The published test vectors are designed to enable such validation.
+
+\paragraph{Complete RFC~8785 Conformance Pending.} The protocol adopts a strict profile based on RFC~8785. Only selected V1.1 profile vectors are tested. Full RFC~8785 Appendix~B numeric vectors and the complete JCS conformance suite are not exercised in the reference test harness.
+
+\subsection{Feature Omissions}
+
+The following capabilities are deliberately deferred. The protocol remains complete and functional without them.
+
+\paragraph{Merkle Acceleration Not Implemented.} The protocol permits Merkle acceleration of long chains. The reference implementation uses linear parent-chain verification, which is sufficient for the tested scale of 1{,}000 to 10{,}000 proofs. At larger scales, acceleration may become necessary.
+
+\paragraph{Selective Disclosure Not Implemented.} The protocol does not implement selective disclosure. A portable evidence package reveals the complete chain to any party that receives it. The specification notes that future extensions MAY support selective disclosure, but no such extension is defined in V1.2.
+
+\subsection{Closed Core Assurance Properties}
+
+The following properties are sometimes cited as critical pre-conditions for session-continuity protocols. Each is closed in the reference implementation with named test evidence.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{@{}p{5.5cm}p{2cm}p{7cm}@{}}
+\toprule
+Property & Status & Evidence \\
+\midrule
+Crash consistency of durable state & CLOSED & \texttt{v1\_1-durable-sequence-probe.mjs} \\
+Independent verification & CLOSED & \texttt{v1\_1-portable-package-probe-v2.mjs} \\
+Authoritative conformance gate & CLOSED & \texttt{v1\_1-regression-gate.mjs} \\
+Semantic test enforcement & CLOSED & \texttt{EVIDENCE-CAPTURE.mjs} --- 251 named checks \\
+Parent binding and sequence strictness & CLOSED & \texttt{v1\_1-chain-probe.mjs} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The distinction between a valid prefix and a complete history is specified in the specification, enforced by the protocol, and exercised by dedicated P0 and reconciled integration probes. Closed-checkpoint finality is bound to the verified final head, while truncated prefixes remain incomplete.
+
+\section{Conclusion}
+
+This paper presented Session Continuity Evidence (SCE), a vendor-neutral protocol for producing portable, independently verifiable evidence of session continuity. The protocol establishes cryptographic continuity from a trusted authenticated session root through an ordered proof chain, durable witness observations, and a portable evidence package. It does not claim that cryptographic continuity proves the legitimacy of the original authentication; it proves only that a session that ended at a later sequence was the continuation of the session that began at sequence~1 within a configured trust domain.
+
+The paper makes three contributions. It specifies the protocol with twelve components covering root establishment, proof construction, canonical serialization, sequence guarding, parent binding, durable witnessing, witness receipt, witness equivocation evidence, key lifecycle, portable packaging, completeness semantics, and independent verification. It provides a normative reference implementation in nine JavaScript modules with zero external runtime dependencies, published with a source-tree digest and a deterministic test harness. It reports an evaluation covering correctness, adversarial resistance, performance, release packaging metadata, and reproducibility.
+
+The reference implementation passes 251 named audit checks across twenty independent probes, matches RFC~8032 Ed25519 golden vectors byte-for-byte, builds a 1{,}000-proof chain in 71~ms and verifies it in 130~ms, produces byte-identical output across independent processes, and rejects adversarial input across chain, witness, package, and key-lifecycle layers.
+
+The protocol is not a replacement for IAM. It does not claim first-in-world status, universal non-equivocation, legal admissibility, or proof of the legitimacy of the original authentication. Its contribution is a precise, tested, and openly specified construction that fills a documented gap: no existing mechanism produces a portable artifact that a third party can verify to establish that a session that ended at $T_n$ was the continuation of a session that began at $T_0$.
+
+The specification, the reference implementation, the test vectors, and the reproducibility digest are published together so that any third party can independently reproduce the results.
+
+\begin{thebibliography}{99}
+
+\bibitem{oauth2} D.~Hardt, Ed., ``The OAuth 2.0 Authorization Framework,'' RFC~6749, IETF, October 2012.
+
+\bibitem{oidc} N.~Sakimura, J.~Bradley, M.~Jones, B.~de~Medeiros, C.~Mortimore, ``OpenID Connect Core 1.0,'' OpenID Foundation, November 2014.
+
+\bibitem{jwt} M.~Jones, J.~Bradley, N.~Sakimura, ``JSON Web Token (JWT),'' RFC~7519, IETF, May 2015.
+
+\bibitem{jws} M.~Jones, J.~Bradley, N.~Sakimura, ``JSON Web Signature (JWS),'' RFC~7515, IETF, May 2015.
+
+\bibitem{tokbind} A.~Popov, M.~Nystroem, D.~Balfanz, J.~Hodges, ``The Token Binding Protocol Version 1.0,'' draft-ietf-tokbind-protocol, IETF, 2018.
+
+\bibitem{pop} M.~Jones, L.~Hunt, D.~Denicola, ``Proof-of-Possession Key Semantics for JSON Web Tokens (JWTs),'' RFC~7800, IETF, April 2016.
+
+\bibitem{macaroons} A.~Birgisson, J.~G.~Politz, U.~Erlingsson, A.~Taly, M.~Vrable, M.~Lentczner, ``Macaroons: Cookies with Contextual Caveats for Decentralized Authorization in the Cloud,'' NDSS 2014.
+
+\bibitem{ct1} B.~Laurie, A.~Langley, E.~Kasper, ``Certificate Transparency,'' RFC~6962, IETF, June 2013.
+
+\bibitem{ct2} B.~Laurie, E.~Messeri, R.~Stradling, ``Certificate Transparency Version 2.0,'' RFC~9162, IETF, December 2021.
+
+\bibitem{coniks} M.~S.~Melara, A.~Blankstein, J.~Bonneau, E.~W.~Felten, M.~J.~Freedman, ``CONIKS: Bringing Key Transparency to End Users,'' USENIX Security 2015.
+
+\bibitem{overlays} S.~Chase, S.~Meiklejohn, ``Transparency Overlays and Applications,'' IACR Cryptology ePrint Archive, Report 2016/915, 2016.
+
+\bibitem{intoto} S.~Torres-Arias, H.~Afzali, T.~K.~Kuppusamy, R.~Curtmola, J.~Cappos, ``in-toto: Providing Farm-to-Table Guarantees for Bits and Bytes,'' USENIX Security 2019.
+
+\bibitem{sigstore} Z.~Newman, J.~S.~Meyers, S.~Torres-Arias, ``Sigstore: Software Signing for Everybody,'' ACM CCS 2022.
+
+\bibitem{scitt-arch} H.~Birkholz, B.~Mandel, M.~Richardson, K.~Krallis, T.~R.~Ranganathan, ``An Architecture for Trustworthy and Transparent Digital Supply Chains,'' RFC~9943, IETF, 2025.
+
+\bibitem{scrapi} O.~Steele, ``The SCITT Reference API (SCRAPI),'' draft-ietf-scitt-scrapi, IETF, ongoing.
+
+\bibitem{jcs} A.~Rundgren, B.~Jordan, S.~Erdtman, ``JSON Canonicalization Scheme (JCS),'' RFC~8785, IETF, June 2020.
+
+\bibitem{ed25519} S.~Josefsson, I.~Liusvaara, ``Edwards-Curve Digital Signature Algorithm (EdDSA),'' RFC~8032, IETF, January 2017.
+
+\bibitem{cose} J.~Schaad, ``CBOR Object Signing and Encryption (COSE): Structures and Process,'' RFC~9052, IETF, August 2022.
+
+\bibitem{rfc3161} C.~Adams, P.~Cain, D.~Pinkas, R.~Zuccherato, ``Internet X.509 Public Key Infrastructure Time-Stamp Protocol (TSP),'' RFC~3161, IETF, August 2001.
+
+\bibitem{nist80063} P.~Grassi, J.~Fenton, E.~Lefkovitz, J.~Danker, Y.-Y.~Choong, K.~Greene, M.~Theofanos, ``Digital Identity Guidelines,'' NIST Special Publication 800-63 Revision 3, 2017.
+
+\bibitem{oauthbcp} T.~Lodderstedt, J.~Bradley, A.~Labunets, D.~Fett, ``OAuth 2.0 Security Best Current Practice,'' draft-ietf-oauth-security-topics, IETF, ongoing.
+
+\bibitem{oauth21} D.~Hardt, A.~Parecki, T.~Lodderstedt, ``The OAuth 2.1 Authorization Framework,'' draft-ietf-oauth-v2-1, IETF, ongoing.
+
+\bibitem{x509} D.~Cooper, S.~Santesson, S.~Farrell, S.~Boeyen, R.~Housley, W.~Polk, ``Internet X.509 Public Key Infrastructure Certificate and Certificate Revocation List (CRL) Profile,'' RFC~5280, IETF, May 2008.
+
+\bibitem{dolevyao} D.~Dolev, A.~C.~Yao, ``On the Security of Public Key Protocols,'' IEEE Transactions on Information Theory, 1983.
+
+\bibitem{eddsa2012} D.~J.~Bernstein, N.~Duif, T.~Lange, P.~Schwabe, B.-Y.~Yang, ``High-Speed High-Security Signatures,'' Journal of Cryptographic Engineering, 2012.
+
+\bibitem{paseto} Platform-Agnostic Security Tokens (PASETO) Specification, version 4, open standard maintained by the PASETO project, 2024.
+
+\bibitem{green2020} M.~Green, ``Transparency and Trust: The Role of Verifiable Logs in Modern Security,'' invited paper, 2020.
+
+\bibitem{appendonly} A.~Tomescu, V.~Bhupatiraju, D.~Papadopoulos, C.~Papamanthou, N.~Triandopoulos, S.~Devadas, ``Transparency Logs via Append-Only Authenticated Dictionaries,'' ACM CCS 2019.
+
+\end{thebibliography}
+
+\end{document}

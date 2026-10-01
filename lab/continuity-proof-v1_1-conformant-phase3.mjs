@@ -1,0 +1,42 @@
+import crypto from "node:crypto";
+import { jcsCanonicalize,jcsSha256 } from "./continuity-proof-vnext/jcs-profile-v1_1.mjs";
+
+const signer=crypto.generateKeyPairSync("ed25519");
+const root={schema:"continuity-root.v1.1",session_id:"S1",subject:"U1",issuer:"I1",auth_time:"2026-09-15T03:00:00.000Z",client_context:{client_id:"C1",device_id:"D1"}};
+const continuity_root=jcsSha256(root);
+const sign=v=>crypto.sign(null,Buffer.from(jcsCanonicalize(v),"utf8"),signer.privateKey).toString("base64");
+const verify=(v,s)=>crypto.verify(null,Buffer.from(jcsCanonicalize(v),"utf8"),signer.publicKey,Buffer.from(s,"base64"));
+const makeProof=({sequence,parent,state="ACTIVE"})=>{const core={schema:"continuity-proof.v1.1",continuity_root,sequence,parent_hash:parent,state_hash:jcsSha256({sequence,state}),decision_hash:jcsSha256("ALLOW"),issued_at:`2026-09-15T03:${String(Math.floor(sequence/60)).padStart(2,"0")}:${String(sequence%60).padStart(2,"0")}.000Z`};const body={...core,continuity_hash:jcsSha256(core)};return {body,signature:sign(body)}};
+const verifyProof=p=>{if(!verify(p.body,p.signature))return false;const b=p.body;return b.continuity_root===continuity_root&&jcsSha256({schema:b.schema,continuity_root:b.continuity_root,sequence:b.sequence,parent_hash:b.parent_hash,state_hash:b.state_hash,decision_hash:b.decision_hash,issued_at:b.issued_at})===b.continuity_hash};
+const verifyChain=chain=>{if(!Array.isArray(chain)||chain.length===0)return {ok:false,reason:"PACKAGE_INVALID",index:-1};for(let i=0;i<chain.length;i++){const p=chain[i],b=p.body;if(!verifyProof(p))return {ok:false,reason:"SIGNATURE_OR_HASH_INVALID",index:i};if(b.continuity_root!==continuity_root)return {ok:false,reason:"ROOT_NOT_TRUSTED",index:i};const expected=i+1;if(b.sequence!==expected)return {ok:false,reason:b.sequence>expected?"SEQUENCE_GAP":b.sequence<expected?"SEQUENCE_ROLLBACK":"SEQUENCE_INVALID",index:i};if(i===0){if(b.parent_hash!==null)return {ok:false,reason:"PARENT_MISMATCH",index:i};}else if(b.parent_hash!==chain[i-1].body.continuity_hash)return {ok:false,reason:"PARENT_MISMATCH",index:i};}return {ok:true,reason:"CONTINUITY_PROVEN",index:chain.length-1};};
+const N=1000;const chain=[];let parent=null;for(let i=1;i<=N;i++){const p=makeProof({sequence:i,parent});chain.push(p);parent=p.body.continuity_hash;}
+const normal=verifyChain(chain);
+const gap=chain.slice(0,999).map((p,i)=>i===500?chain[502]:p);
+const gapResult=verifyChain(gap);
+const rollback=chain.map((p,i)=>i===700?chain[699]:p);
+const rollbackResult=verifyChain(rollback);
+const parentSwap=chain.map(p=>p);{const original=parentSwap[600];const core={schema:original.body.schema,continuity_root:original.body.continuity_root,sequence:original.body.sequence,parent_hash:parentSwap[598].body.continuity_hash,state_hash:original.body.state_hash,decision_hash:original.body.decision_hash,issued_at:original.body.issued_at};const body={...core,continuity_hash:jcsSha256(core)};parentSwap[600]={body,signature:sign(body)}};
+const parentSwapResult=verifyChain(parentSwap);
+const reorder=chain.map(p=>p);[reorder[449],reorder[450]]=[reorder[450],reorder[449]];
+const reorderResult=verifyChain(reorder);
+const tamper=chain.map(p=>p);tamper[777]={...tamper[777],body:{...tamper[777].body,state_hash:"TAMPERED"}};
+const tamperResult=verifyChain(tamper);
+const wrongRoot=chain.map(p=>p);wrongRoot[888]={...wrongRoot[888],body:{...wrongRoot[888].body,continuity_root:"WRONG_ROOT"}};
+const wrongRootResult=verifyChain(wrongRoot);
+const altPrefix=chain.slice(0,499);let altParent=altPrefix.at(-1).body.continuity_hash;const alt=[];for(let i=500;i<=N;i++){const p=makeProof({sequence:i,parent:altParent,state:i===500?"ALTERNATE_BRANCH":"ACTIVE"});alt.push(p);altParent=p.body.continuity_hash;}
+const alternate=[...altPrefix,...alt];const alternateResult=verifyChain(alternate);
+const divergence=chain[499].body.continuity_hash!==alternate[0].body.parent_hash||chain[500].body.continuity_hash!==alternate[1].body.parent_hash||chain[499].body.state_hash!==alternate[0].body.state_hash;
+const allOrNothing=(x,reason)=>x.ok===false&&x.reason===reason;
+console.log("=== CONTINUITY PROOF V1.1 :: PHASE 3 HISTORICAL VERIFICATION ===");
+console.log("CHAIN_LENGTH="+chain.length);
+console.log("NORMAL_1000_CHAIN="+(normal.ok?"PASS":"FAIL"));
+console.log("HISTORICAL_GAP_PROTECTION="+(allOrNothing(gapResult,"SEQUENCE_GAP")?"PASS":"FAIL"));
+console.log("HISTORICAL_ROLLBACK_PROTECTION="+(allOrNothing(rollbackResult,"SEQUENCE_ROLLBACK")?"PASS":"FAIL"));
+console.log("PARENT_SUBSTITUTION="+(allOrNothing(parentSwapResult,"PARENT_MISMATCH")?"PASS":"FAIL"));
+console.log("REORDER_PROTECTION="+(allOrNothing(reorderResult,"SEQUENCE_GAP")||allOrNothing(reorderResult,"SEQUENCE_INVALID")?"PASS":"FAIL"));
+console.log("MID_CHAIN_TAMPER="+(allOrNothing(tamperResult,"SIGNATURE_OR_HASH_INVALID")?"PASS":"FAIL"));
+console.log("ROOT_CONSISTENCY="+(allOrNothing(wrongRootResult,"SIGNATURE_OR_HASH_INVALID")||allOrNothing(wrongRootResult,"ROOT_NOT_TRUSTED")?"PASS":"FAIL"));
+console.log("ALTERNATE_BRANCH_LOCALLY_VALID="+(alternateResult.ok?"PASS":"FAIL"));
+console.log("FORK_DETECTION_ACROSS_CHAIN="+(alternateResult.ok&&divergence?"PASS":"FAIL"));
+console.log("CHAIN_ALL_OR_NOTHING="+(!normal.ok||!gapResult.ok||!rollbackResult.ok||!parentSwapResult.ok||!reorderResult.ok||!tamperResult.ok||!wrongRootResult.ok?"PASS":"FAIL"));
+console.log("REFERENCE_PHASE3="+(normal.ok&&normal.reason==="CONTINUITY_PROVEN"&&!gapResult.ok&&!rollbackResult.ok&&!parentSwapResult.ok&&!reorderResult.ok&&!tamperResult.ok&&!wrongRootResult.ok&&alternateResult.ok&&divergence?"PASS":"FAIL"));

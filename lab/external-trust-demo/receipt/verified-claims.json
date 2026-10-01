@@ -1,0 +1,8 @@
+{
+  "verified": true,
+  "sub": "user-external-001",
+  "iss": "https://issuer.example",
+  "sid": "sid-external-001",
+  "auth_time": "2026-09-13T21:30:00.000Z",
+  "aud": "client-external"
+}

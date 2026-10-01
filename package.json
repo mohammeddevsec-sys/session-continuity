@@ -1,0 +1,23 @@
+﻿{
+    "name":  "session-continuity",
+    "version":  "0.2.0",
+    "private":  false,
+    "license":  "Apache-2.0",
+    "type":  "module",
+    "description":  "Vendor-neutral session continuity and provenance proof product",
+    "repository":  {
+                       "type":  "git",
+                       "url":  "https://github.com/YOUR-USER/session-continuity.git"
+                   },
+    "bin":  {
+                "session-continuity":  "bin/session-continuity.mjs"
+            },
+    "scripts":  {
+                    "test":  "node test/run-all-tests.mjs",
+                    "demo":  "node bin/demo.mjs",
+                    "version":  "node bin/session-continuity.mjs --version",
+                    "test:delegation":  "node test/delegation-chain.test.mjs",
+                    "test:transparency":  "node test/transparency-log.test.mjs",
+                    "test:revocation":  "node test/revocation-rrp.test.mjs"
+                }
+}

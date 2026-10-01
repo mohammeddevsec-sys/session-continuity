@@ -1,0 +1,7 @@
+{
+  "schema_id": "session-continuity.signing-authority.v1",
+  "version": 1,
+  "signer_public_key_fingerprint_sha256": "9b413fe040e3650a610bc7e37023b610c18b47666358d515c08cb60a9933810f",
+  "created_at": "2026-09-13T15:40:14.941Z",
+  "label": "cli-session-provenance-authority"
+}

@@ -1,0 +1,79 @@
+{
+  "results": [
+    {
+      "scenario": "01_HEALTHY",
+      "oidc": "ALLOW",
+      "cae": "ALLOW",
+      "continuity": "ALLOW",
+      "detail": "SESSION_CONTINUITY_PROVEN"
+    },
+    {
+      "scenario": "02_USER_REVOCATION_EVENT",
+      "oidc": "ALLOW",
+      "cae": "REJECT",
+      "continuity": "ALLOW",
+      "detail": "SESSION_CONTINUITY_PROVEN"
+    },
+    {
+      "scenario": "03_IP_POLICY_EVENT",
+      "oidc": "ALLOW",
+      "cae": "REJECT",
+      "continuity": "ALLOW",
+      "detail": "SESSION_CONTINUITY_PROVEN"
+    },
+    {
+      "scenario": "04_DEVICE_CHANGED_WITHOUT_CAE_EVENT",
+      "oidc": "ALLOW",
+      "cae": "ALLOW",
+      "continuity": "REAUTH",
+      "detail": "CONTINUITY_BROKEN"
+    },
+    {
+      "scenario": "05_SEQUENCE_REPLAY_ATTEMPT",
+      "oidc": "ALLOW",
+      "cae": "ALLOW",
+      "continuity": "REAUTH",
+      "detail": "REPLAY_DETECTED"
+    },
+    {
+      "scenario": "06_POST_DECISION_EVIDENCE_TAMPER",
+      "oidc": "NOT_APPLICABLE",
+      "cae": "NOT_APPLICABLE",
+      "continuity": "REJECT",
+      "detail": "HASH_MISMATCH:evidence.json"
+    }
+  ],
+  "expectations": {
+    "01_HEALTHY": [
+      "ALLOW",
+      "ALLOW",
+      "ALLOW"
+    ],
+    "02_USER_REVOCATION_EVENT": [
+      "ALLOW",
+      "REJECT",
+      "ALLOW"
+    ],
+    "03_IP_POLICY_EVENT": [
+      "ALLOW",
+      "REJECT",
+      "ALLOW"
+    ],
+    "04_DEVICE_CHANGED_WITHOUT_CAE_EVENT": [
+      "ALLOW",
+      "ALLOW",
+      "REAUTH_REQUIRED"
+    ],
+    "05_SEQUENCE_REPLAY_ATTEMPT": [
+      "ALLOW",
+      "ALLOW",
+      "REAUTH_REQUIRED"
+    ],
+    "06_POST_DECISION_EVIDENCE_TAMPER": [
+      "NOT_APPLICABLE",
+      "NOT_APPLICABLE",
+      "REJECT"
+    ]
+  },
+  "labResult": "FAIL"
+}

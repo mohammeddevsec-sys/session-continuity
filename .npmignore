@@ -1,0 +1,40 @@
+# Internal secrets - MUST NOT be published
+authority/
+*.pem
+*.key
+
+# Internal testing artifacts
+lab/
+release/
+test/fixtures/_probe_*/
+
+# Internal backups
+*.backup_*
+*.backup
+*.tmp-*
+*.lock
+
+# Internal result files
+lab-result.json
+*_probe_*
+_diag_*
+
+# Node.js / editors / OS
+node_modules/
+.git/
+.gitignore
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Build/coverage artifacts
+coverage/
+*.log
+npm-debug.log*
+# Mangled root-level artifacts (path-concatenation bug)
+SESSION-CONTINUITYlab*/
+
+# Debug/test-internal folders
+test/fixtures/_*/
+*_trust-debug/

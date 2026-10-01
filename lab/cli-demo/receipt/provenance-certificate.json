@@ -1,0 +1,17 @@
+{
+  "schema_id": "session-continuity.session-provenance-certificate.v1",
+  "version": 1,
+  "session_id": "sid-cli-001",
+  "subject": "user-001",
+  "issuer": "https://issuer.example",
+  "decision": "ALLOW",
+  "policy_fingerprint_sha256": "0edbf5fb6f346d10afed49c2e6c490d497a498d442ec21b6dfc52152b0db3595",
+  "bundle_root_sha256": "906c66708310ba6e49289712db9c11a9ea041fd023d1ee11c636bcc77141c1e1",
+  "lineage_root_sha256": "8c0270017ce16e64cd7c0cb6f59114a4a090a9e6bacf0274f328b6bbe17b4123",
+  "merkle_root_sha256": "e1f1abef5ca29d684538eb2cf5a78bdd579556f79354a6e11322ab81fd83d49e",
+  "evidence_fingerprint_sha256": "69f81dad30a7af371200f6bd5ac5789891d42520fb3067e4667d50bd01a98ffa",
+  "sequence": 1,
+  "signer_public_key_fingerprint_sha256": "847308eb6ac894ff156052b32f12c6ae1136097870ee69f82b34566ee3ebed18",
+  "signer_public_key_spki_base64": "MCowBQYDK2VwAyEAAFxprKuQGtK9DPHhdnZSynW7BmVyCy/iTYG/JrLznDY=",
+  "signature_base64": "UmT5Sp+GsrunbCHE2bL+F73Rhky/6oYgEe+tMmcIgUaWYLmdfpKwzKMK1hDwUxpkZLDBa8INKwvosdeQY+s9Bg=="
+}

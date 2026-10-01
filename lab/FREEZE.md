@@ -1,0 +1,43 @@
+# Freeze Snapshot
+
+Date: 2026-09-17
+Purpose: record SHA-256 of every critical artifact so that any unintended change is detectable.
+
+| Artifact | Size (bytes) | SHA-256 |
+|---|---|---|
+| `lab\PAPER.md` | 49775 | `266E6D7D573D06E0529DBB56AB11FD886369F176E2E8DC019A2EB03B819CFB95` |
+| `lab\PAPER.tex` | 52425 | `E74E7A684B9664B0EE1BE4BD4DEAE04C6E68ED16E8A1760FB038A4E39AB14AC1` |
+| `lab\EVIDENCE-AUDIT.md` | 21146 | `05BB464510B8FB3E39F7F2A50C791E18AE0F3F20B2455F1316D8B1B33F5E2F64` |
+| `lab\PROOF.mjs` | 4660 | `6704C1E121B2FAC474A4A2042507FB987E35CC81DC592C2A35119614CA2CBA63` |
+| `lab\EVIDENCE-CAPTURE.mjs` | 3669 | `28441DFC2318FABD21C9AE0B390A7CD3B0575F880051D391F11A37303D726446` |
+| `lab\LATEX-AUDIT.mjs` | 3759 | `745639BD469929372AF426E9861A4E289FB841BCD1BF88FA97F8313E3A639B29` |
+| `lab\CLAIM-EVIDENCE-AUDIT.mjs` | 6150 | `69063BECC0B143646A62E09076B43861357EB456868443F1155A310EA4BD5343` |
+| `lab\ALIGNMENT-AUDIT.mjs` | 4489 | `0BB1B3088152977AE02C80E19617F452F647E7EB2821B209FBC915D581D36CF2` |
+| `lab\_full-audit.mjs` | 17736 | `5067FB2C21EEC8ABE51FE1F33949494BD9E05D52FA2F14E41092E3746B220D35` |
+| `lab\v1_1-regression-gate.mjs` | 1734 | `7F768D6C0CD52A69925B1C530126A40ABD0F0B27C7FABC291AB16B63FA7C97CC` |
+| `lab\continuity-proof-vnext\SPEC-DRAFT-V1_2.md` | 28697 | `A48456DCD6AC0B0196511241AFD50F92D56B79DC4333085BC24CD61D6FC3478F` |
+| `lab\continuity-proof-vnext\SPEC-DRAFT-V1_1-RECONCILED.md` | 17261 | `D92B8E795A0515DE25C9DE86A9177AE48150E24BE9BF34744F530D0D4BD30F32` |
+| `package.json` | 534 | `A40BD1451EF768C50A6A5C772271E3681A747CDF43DEF3DF8663A375BC23D1C8` |
+
+## Pending External Action
+
+1. Compile `lab/PAPER.tex` on Overleaf (or local LaTeX toolchain) to confirm it builds without errors.
+2. Fill in author name, email, and affiliation in `lab/PAPER.tex` (currently placeholder).
+3. Create an arXiv account and obtain cs.CR endorsement if required.
+4. Upload the compiled PDF and source to arXiv.
+
+## Internal Gates - All Passed
+
+| Gate | Result | Artifact |
+|---|---|---|
+| Structural LaTeX audit | PASS | `lab/LATEX-AUDIT.mjs` |
+| Claim/evidence alignment | PASS 11/11 | `lab/CLAIM-EVIDENCE-AUDIT.mjs` |
+| MD <-> TEX section alignment | PASS 53/53 | `lab/ALIGNMENT-AUDIT.mjs` |
+| V1 regression | PASS 38/38 | `test/run-all-tests.mjs` |
+| V1.1 regression | PASS 12/12 | `lab/v1_1-regression-gate.mjs` |
+| Evidence audit | PASS 201/201 | `lab/EVIDENCE-AUDIT.md` |
+| Determinism | PASS | `lab/PROOF.mjs` |
+
+## Source Tree Digest
+
+SRC_TREE_SHA256 = 39A8726C9BB86055DAFFD9A5C7C94E5919F96B0A9780723079E1BC35EEEE9ACF

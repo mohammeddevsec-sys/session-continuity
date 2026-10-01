@@ -1,0 +1,17 @@
+import fs from "fs";
+import path from "path";
+import { createSecureSessionState, issueChallenge, commitSessionAcceptance, verifySecureSessionState } from "../../src/core/durable-secure-session-state.js";
+const root=path.join("E:\\\\SESSION-CONTINUITY","lab","continuity-proof-vnext","fixtures","durable-sequence-gap-baseline");
+fs.rmSync(root,{recursive:true,force:true});
+const state=createSecureSessionState(root,60000);
+const c1=issueChallenge(state,"sess-gap",100000);
+const p1=commitSessionAcceptance(state,"sess-gap",1,c1.challenge,100001);
+const c3=issueChallenge(state,"sess-gap",200000);
+const p3=commitSessionAcceptance(state,"sess-gap",3,c3.challenge,200001);
+const verified=verifySecureSessionState(state);
+console.log("P1_DECISION="+p1.decision+"|"+p1.reason);
+console.log("P3_DECISION="+p3.decision+"|"+p3.reason);
+console.log("STORED_SEQUENCE="+state.sessions.get("sess-gap"));
+console.log("JOURNAL_HEIGHT="+verified.journal_height);
+console.log("GAP_ACCEPTED_BY_CURRENT_STATE="+(p1.decision==="CONTINUOUS"&&p3.decision==="CONTINUOUS"&&state.sessions.get("sess-gap")===3?"YES":"NO"));
+console.log("BASELINE_GAP_BEHAVIOR="+(p3.decision==="CONTINUOUS"?"CONFIRMED":"NOT_CONFIRMED"));

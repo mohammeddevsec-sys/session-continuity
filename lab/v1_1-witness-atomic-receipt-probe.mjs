@@ -1,0 +1,36 @@
+import fs from "fs";
+import { jcsCanonicalize } from "../src/core/canonical-v1_1.js";
+import os from "os";
+import path from "path";
+import { createDurableWitness, createWitnessIdentity, witnessObserve, witnessGetHead, verifyWitnessReceipt } from "../src/evidence/witness-v1_1.js";
+const dir=fs.mkdtempSync(path.join(os.tmpdir(),"sc-witness-atomic-"));
+const root="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const ch="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+const ph="cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+const input={continuityRoot:root,sequence:1,continuityHash:ch,proofHash:ph,issuedAt:"2026-09-18T08:00:00.000Z"};
+try{
+  const identity=createWitnessIdentity({keyId:"W1"});
+  const s=createDurableWitness({directory:dir,witnessDomainId:"DOMAIN-1",identity});
+  const first=witnessObserve(s,input);
+  const state=JSON.parse(fs.readFileSync(path.join(dir,"WITNESS_STATE.json"),"utf8"));
+  const entry=state.roots[root]?.history?.["1"];
+  const receiptSaved=!!entry?.receipt;
+  const receiptMatches=receiptSaved&&entry.receipt.signature_base64===first.receipt?.signature_base64;
+  const receiptValid=receiptSaved&&verifyWitnessReceipt(entry.receipt).verified===true;
+  const head=witnessGetHead(s,root);
+  const restarted=createDurableWitness({directory:dir,witnessDomainId:"DOMAIN-1",identity});
+  const replay=witnessObserve(restarted,input);
+  const replaySame=jcsCanonicalize(replay.receipt)===jcsCanonicalize(first.receipt);
+  const head2=witnessGetHead(restarted,root);
+  const stable=head2.head_sequence===1&&head2.head_hash===ch;
+  console.log("FIRST_ADVANCED="+(first.result==="ADVANCED"?"PASS":"FAIL"));
+  console.log("RECEIPT_SAVED_WITH_HEAD="+(receiptSaved&&head.head_sequence===1?"PASS":"FAIL"));
+  console.log("SAVED_RECEIPT_MATCHES_RETURNED="+(receiptMatches?"PASS":"FAIL"));
+  console.log("SAVED_RECEIPT_VERIFIES="+(receiptValid?"PASS":"FAIL"));
+  console.log("RESTART_REPLAY_IDEMPOTENT="+(replay.result==="IDEMPOTENT_REPLAY"?"PASS":"FAIL"));
+  console.log("REPLAY_RECEIPT_IDENTICAL="+(replaySame?"PASS":"FAIL"));
+  console.log("HEAD_STABLE_AFTER_RESTART="+(stable?"PASS":"FAIL"));
+  const ok=first.result==="ADVANCED"&&receiptSaved&&receiptMatches&&receiptValid&&replay.result==="IDEMPOTENT_REPLAY"&&replaySame&&stable;
+  console.log("WITNESS_ATOMIC_RECEIPT_PROBE_DONE="+(ok?"1":"0"));
+  if(!ok) process.exit(2);
+}finally{fs.rmSync(dir,{recursive:true,force:true});}

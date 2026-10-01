@@ -1,0 +1,17 @@
+{
+  "schema_id": "session-continuity.session-provenance-certificate.v1",
+  "version": 1,
+  "session_id": "sid-external-001",
+  "subject": "user-external-001",
+  "issuer": "https://issuer.example",
+  "decision": "ALLOW",
+  "policy_fingerprint_sha256": "0edbf5fb6f346d10afed49c2e6c490d497a498d442ec21b6dfc52152b0db3595",
+  "bundle_root_sha256": "82931f5694cf4044823371bf766e9b9104baef947cb22104de66516a58b9736c",
+  "lineage_root_sha256": "d94e3b0d492afd62060add26e684291a3f5f8ba670d3f0392a7c792a25dbb068",
+  "merkle_root_sha256": "106a66b9ddb8eb4c0877e5fe1e104d4828189bf2a01ae70bd48cb93ab086239f",
+  "evidence_fingerprint_sha256": "1a8da4fcd393324c204a04cdf4f1660ab62942e3b56766496eaf49b0f11447f9",
+  "sequence": 1,
+  "signer_public_key_fingerprint_sha256": "a9bbdce09bd5153350a07e98ce8efd75c0f3622e1d0f6e380dacc8cc1058e1f8",
+  "signer_public_key_spki_base64": "MCowBQYDK2VwAyEA+/Ok5fjV2YZXZQ3dU/v0rjUxnFHfoKzRnSgHB/FZmZ8=",
+  "signature_base64": "fpaMucPyIN18QvZ0JFikDPPvGnx/ZExPpjgnb67vg1jE5Teb4QnnJnMZheh2tAonrNPGElprKTjYQ1nzxyPlCw=="
+}

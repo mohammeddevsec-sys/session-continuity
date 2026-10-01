@@ -1,0 +1,23 @@
+﻿node_modules/
+_dev-history/
+*.backup_*
+lab/_backups/
+authority/*.pem
+**/signer-private.pem
+*.tmp
+.DS_Store
+Thumbs.db
+
+# ── temp reports & artifacts
+_AUDIT_*.txt
+lab/_v1-regression-error.txt
+lab/_npm-pack-*.txt
+lab/_proof_run*.txt
+lab/src-unicode-ordering-gate.out.txt
+
+# ── release duplicates (احفظ فقط zip النهائي إن أردت)
+release/session-continuity-0.1.0/
+release/delivery-validation/
+
+# ── debug fixtures
+**/_trust-debug/
