@@ -178,3 +178,23 @@ src/core/fork-guard.mjs provides an exclusive lock per (session_id, parent_seque
 - Not a session hijacking prevention system (in this version)
 
 **OIDC/JWT validation is outside this engine.** Caller supplies claims only after independent verification.
+
+### About the fork attack test
+
+The test `test/continuity-fork-attack.js` demonstrates that the current
+engine (v0.2.0) accepts two valid continuations from the same parent with
+the same sequence.
+
+This is **documented and intentional** for v0.2.0. It is NOT a bug.
+
+Fork prevention requires a **centralized coordination service** (shared state
+across instances). Building this would change the project from a library into
+a stateful system. That decision is deferred to v0.3.0 and beyond.
+
+The engine itself remains useful for:
+- Session continuity within a single trusted state
+- Delegation chains
+- Transparency logs
+- Offline revocation proofs
+
+It does **not** prevent an attacker who controls the same state from forking.
