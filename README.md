@@ -99,3 +99,82 @@ Apache 2.0 — see [LICENSE](LICENSE).
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+---
+
+## Known Limitations
+
+This is an early-stage library. The following limitations are documented explicitly.
+
+1. **No fork attack prevention in the engine.** The core engine accepts two valid continuations from the same parent with the same sequence. Supporting primitives (parent-binding, binding-store, fork-guard) exist but are not integrated.
+
+2. **No strict sequence enforcement.** The engine accepts sequence jumps (e.g., 1 to 3) without verifying 2 exists.
+
+3. **No third-party security audit.** The code has not been reviewed by an independent security team.
+
+4. **No BBS+ or ZK-SNARK privacy layer.** Session identifiers and subjects are visible in the evidence bundle.
+
+5. **No hardware binding.** Sessions are not bound to TPM, Secure Enclave, or any hardware root of trust.
+
+6. **Performance testing is limited.** Revocation reachability was measured at 100 edges (11 ms). Larger graphs have not been benchmarked.
+
+---
+
+## Roadmap
+
+### v0.3.0 (planned)
+
+- Integrate parent-binding and binding-store into the core engine.
+- Strict sequence enforcement (n+1).
+- Update continuity-fork-attack.js to expect rejection.
+
+### v0.4.0 (planned)
+
+- Hardware-bound sessions (TPM on Windows, Secure Enclave on macOS).
+
+### v0.5.0+ (exploratory)
+
+- BBS+ selective disclosure for privacy-preserving proofs.
+- Cross-domain delegation support.
+
+---
+
+## Additional Modules
+
+Beyond the core engine, three standalone cryptographic modules are implemented and tested independently.
+
+### Delegation Chain (Ed25519)
+
+src/delegation/ — signed chain of delegated authority. Verifier needs only the public key. Depth limit: 5.
+
+Run tests: npm run test:delegation
+
+### Transparency Log (RFC 6962)
+
+src/transparency/ — append-only Merkle log for session events. Compatible with Certificate Transparency tooling.
+
+Run tests: npm run test:transparency
+
+### Revocation Reachability Proof
+
+src/revocation/ — given a revoked delegation edge, proves offline which agents lose authority and which survive via an independent path.
+
+Run tests: npm run test:revocation
+
+### Supporting Primitives (Not Yet Integrated)
+
+src/core/parent-binding.mjs and src/core/binding-store.mjs provide signed single-use commitments and a hash-chained consumed list. Tested in isolation but not yet wired into the core engine. Integration planned for v0.3.0.
+
+src/core/fork-guard.mjs provides an exclusive lock per (session_id, parent_sequence). Tested in isolation. Integration deferred to v0.3.0.
+
+---
+
+## What This Is NOT
+
+- Not an identity provider
+- Not an OAuth/OIDC implementation
+- Not a SIEM/UEBA platform
+- Not a vulnerability scanner
+- Not a session hijacking prevention system (in this version)
+
+**OIDC/JWT validation is outside this engine.** Caller supplies claims only after independent verification.
