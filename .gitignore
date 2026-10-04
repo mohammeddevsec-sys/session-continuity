@@ -21,3 +21,11 @@ release/delivery-validation/
 
 # ── debug fixtures
 **/_trust-debug/
+
+# Patch scripts (temporary)
+patch-*.cjs
+*.bak-before-*
+*.bak
+*.tmp
+*.orig
+*.staging
