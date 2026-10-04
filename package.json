@@ -20,6 +20,7 @@
                     "test:transparency":  "node test/transparency-log.test.mjs",
                     "test:revocation":  "node test/revocation-rrp.test.mjs",
                     "test:parent-binding":  "node test/parent-binding.test.mjs",
-                    "test:binding-store":  "node test/binding-store.test.mjs"
+                    "test:binding-store":  "node test/binding-store.test.mjs",
+                    "test:fork-guard":  "node test/fork-guard.test.mjs"
                 }
 }
