@@ -1,4 +1,4 @@
-﻿import fs from "fs";
+import fs from "fs";
 import path from "path";
 import { writeEvidenceBundle } from "../src/evidence/evidence-bundle.js";
 import { appendEvidenceLineage } from "../src/evidence/evidence-lineage.js";

@@ -1,4 +1,4 @@
-﻿import {
+import {
   evaluateDurableSecureSession
 } from "./durable-secure-session-engine.js";
 import {

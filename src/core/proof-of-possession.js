@@ -1,4 +1,4 @@
-﻿import crypto from "crypto";
+import crypto from "crypto";
 import { canonicalStringify } from "./canonical.js";
 
 export function createBindingKey() {

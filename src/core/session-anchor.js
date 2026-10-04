@@ -1,4 +1,4 @@
-﻿export const SESSION_STATES = Object.freeze({ ACTIVE: "ACTIVE", BROKEN: "BROKEN", REAUTH_REQUIRED: "REAUTH_REQUIRED" });
+export const SESSION_STATES = Object.freeze({ ACTIVE: "ACTIVE", BROKEN: "BROKEN", REAUTH_REQUIRED: "REAUTH_REQUIRED" });
 
 export function createSessionAnchor(input) {
   if (!input || typeof input !== "object") throw new TypeError("session input required");

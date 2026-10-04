@@ -35,7 +35,7 @@ First, we specify a protocol, Session Continuity Evidence (SCE), that produces e
 
 Second, we provide a normative reference implementation in the form of nine JavaScript modules with zero external runtime dependencies. The implementation is deterministic: two consecutive runs of the same input produce byte-identical output.
 
-Third, we evaluate the implementation. It passes 251 named audit checks across twenty independent probes, including a 41-test v1 regression suite and twelve v1.1 conformance probes. It matches RFC 8032 Ed25519 golden vectors byte-for-byte, builds a 1,000-proof chain in 71 ms and verifies it in 130 ms, declares the reference package as a private `session-continuity-engine@0.2.0` package, and rejects thirty-four categories of adversarial input across chain, witness, package, and key-lifecycle layers.
+Third, we evaluate the implementation. It passes 251 named audit checks across twenty independent probes, including a 41-test v1 regression suite and twelve v1.1 conformance probes. It matches RFC 8032 Ed25519 golden vectors byte-for-byte, builds a 1,000-proof chain in 71 ms and verifies it in 130 ms, declares the reference package as a public `session-continuity@0.2.0` package (Apache-2.0), and rejects thirty-four categories of adversarial input across chain, witness, package, and key-lifecycle layers.
 
 Fourth, we publish the specification, the reference implementation, and the test vectors so that any third party can reproduce the results. The reference implementation is preserved alongside the existing v1 production namespace without any modification to the v1 contract.
 

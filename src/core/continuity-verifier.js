@@ -1,4 +1,4 @@
-﻿import { SESSION_STATES, validateSessionAnchor } from "./session-anchor.js";
+import { SESSION_STATES, validateSessionAnchor } from "./session-anchor.js";
 
 export function verifyContinuity(anchor, presented) {
   if (!validateSessionAnchor(anchor)) return { decision: "REAUTH_REQUIRED", reason: "INVALID_ANCHOR" };

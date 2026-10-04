@@ -1,4 +1,4 @@
-﻿import { buildTree, inclusionProof } from "./merkle-tree.mjs";
+import { buildTree, inclusionProof } from "./merkle-tree.mjs";
 
 /**
  * Append-only transparency log.

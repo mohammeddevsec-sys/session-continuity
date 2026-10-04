@@ -1,4 +1,4 @@
-﻿export function canonicalize(value) {
+export function canonicalize(value) {
   if (value === null) return null;
 
   const type = typeof value;

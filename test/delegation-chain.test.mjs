@@ -1,4 +1,4 @@
-﻿import { DelegationChain } from "../src/delegation/chain-builder.mjs";
+import { DelegationChain } from "../src/delegation/chain-builder.mjs";
 import { ChainVerifier } from "../src/delegation/chain-verifier.mjs";
 
 function main() {

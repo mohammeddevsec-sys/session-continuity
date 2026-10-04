@@ -1,4 +1,4 @@
-﻿/**
+/**
  * FORK ATTACK TEST
  *
  * Verifies that fork-registry blocks a second continuation from

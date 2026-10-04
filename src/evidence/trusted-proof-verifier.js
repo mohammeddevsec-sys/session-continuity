@@ -1,4 +1,4 @@
-﻿import { verifyProofSignature } from "./proof-signature.js";
+import { verifyProofSignature } from "./proof-signature.js";
 import { verifyTrustedSigner } from "./trust-anchor.js";
 
 export function verifyTrustedProof(certificate, trustStore) {

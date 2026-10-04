@@ -1,4 +1,4 @@
-﻿import { createSessionAnchor } from "../../src/core/session-anchor.js";
+import { createSessionAnchor } from "../../src/core/session-anchor.js";
 import { verifyContinuity } from "../../src/core/continuity-verifier.js";
 
 const anchor = createSessionAnchor({

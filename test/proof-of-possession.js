@@ -1,4 +1,4 @@
-﻿import crypto from "crypto";
+import crypto from "crypto";
 import { createSessionAnchor } from "../src/core/session-anchor.js";
 import {
   createBindingKey,

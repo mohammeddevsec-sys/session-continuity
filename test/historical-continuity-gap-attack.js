@@ -1,4 +1,4 @@
-﻿import fs from "fs";
+import fs from "fs";
 import path from "path";
 import os from "os";
 import { provisionSigningAuthority } from "../src/evidence/signing-authority.js";

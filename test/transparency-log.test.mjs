@@ -1,4 +1,4 @@
-﻿import { TransparencyLog } from "../src/transparency/log-builder.mjs";
+import { TransparencyLog } from "../src/transparency/log-builder.mjs";
 import { LogVerifier } from "../src/transparency/log-verifier.mjs";
 
 function main() {

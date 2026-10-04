@@ -1,4 +1,4 @@
-﻿import crypto from "node:crypto";
+import crypto from "node:crypto";
 import { performance } from "node:perf_hooks";
 import { DelegationGraph } from "../src/revocation/graph.mjs";
 import { buildProof } from "../src/revocation/proof.mjs";

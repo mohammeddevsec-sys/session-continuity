@@ -1,4 +1,4 @@
-﻿import crypto from "node:crypto";
+import crypto from "node:crypto";
 
 /**
  * RFC 6962-style Merkle tree (Certificate Transparency compatible).

@@ -1,4 +1,4 @@
-﻿import crypto from "node:crypto";
+import crypto from "node:crypto";
 
 const BINDING_VERSION = "1.0.0";
 const BINDING_TTL_MS = 60000;

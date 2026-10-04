@@ -1,4 +1,4 @@
-﻿import {
+import {
   createSigningIdentity,
   signProof,
   verifyProofSignature

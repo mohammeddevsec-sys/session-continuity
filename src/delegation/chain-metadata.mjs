@@ -1,4 +1,4 @@
-﻿export const CHAIN_VERSION = "1.0.0";
+export const CHAIN_VERSION = "1.0.0";
 export const MAX_DELEGATION_DEPTH = 5;
 export const MAX_AUTHORIZATION_ITERATIONS = 1000;
 export const MAX_AUTHORIZATION_TIME_MICRO = 1000000;

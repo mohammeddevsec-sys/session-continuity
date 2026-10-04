@@ -1,4 +1,4 @@
-﻿import { createEvidenceContract, verifyEvidenceFingerprint } from "../src/evidence/evidence-contract.js";
+import { createEvidenceContract, verifyEvidenceFingerprint } from "../src/evidence/evidence-contract.js";
 
 const base = {
   sessionId: "sess-secure-001",

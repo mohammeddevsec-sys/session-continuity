@@ -1,4 +1,4 @@
-﻿import crypto from "node:crypto";
+import crypto from "node:crypto";
 import { computeReachability, diffReachability } from "./reachability.mjs";
 
 export function verifyProof(proof) {

@@ -1,4 +1,4 @@
-﻿export function createReplayState() {
+export function createReplayState() {
   return Object.freeze({ lastSequence: 0 });
 }
 

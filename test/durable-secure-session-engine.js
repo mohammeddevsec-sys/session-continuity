@@ -1,4 +1,4 @@
-﻿import fs from "fs";
+import fs from "fs";
 import { createSessionAnchor } from "../src/core/session-anchor.js";
 import {
   createBindingKey,

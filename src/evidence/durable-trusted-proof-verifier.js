@@ -1,4 +1,4 @@
-﻿import { verifyProofSignature } from "./proof-signature.js";
+import { verifyProofSignature } from "./proof-signature.js";
 import { verifyDurableTrust } from "./durable-trust-store.js";
 
 export function verifyDurableTrustedProof(certificate, durableTrustStore) {

@@ -1,4 +1,4 @@
-﻿import crypto from "crypto";
+import crypto from "crypto";
 import { verifyContinuity } from "./continuity-verifier.js";
 import { verifySequence, advanceReplayState } from "./replay-guard.js";
 import { canonicalStringify } from "./canonical.js";

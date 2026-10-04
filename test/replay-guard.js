@@ -1,4 +1,4 @@
-﻿import { createReplayState, verifySequence, advanceReplayState } from "../src/core/replay-guard.js";
+import { createReplayState, verifySequence, advanceReplayState } from "../src/core/replay-guard.js";
 
 let state = createReplayState();
 

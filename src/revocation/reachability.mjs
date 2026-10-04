@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Compute which nodes are reachable from the root
  * given a set of active edges.
  *

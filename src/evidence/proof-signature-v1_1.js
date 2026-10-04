@@ -1,4 +1,4 @@
-﻿import crypto from "crypto";
+import crypto from "crypto";
 import { jcsCanonicalize } from "../core/canonical-v1_1.js";
 
 const SCHEMA_ID = "continuity-proof.v1.1";

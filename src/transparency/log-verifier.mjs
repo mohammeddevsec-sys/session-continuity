@@ -1,4 +1,4 @@
-﻿import { verifyInclusion, buildTree } from "./merkle-tree.mjs";
+import { verifyInclusion, buildTree } from "./merkle-tree.mjs";
 
 export class LogVerifier {
   static verifyEntry(leafData, proof, rootBase64) {

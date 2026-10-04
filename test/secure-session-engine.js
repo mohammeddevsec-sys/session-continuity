@@ -1,4 +1,4 @@
-﻿import { createSessionAnchor } from "../src/core/session-anchor.js";
+import { createSessionAnchor } from "../src/core/session-anchor.js";
 import { createReplayState } from "../src/core/replay-guard.js";
 import {
   createBindingKey,

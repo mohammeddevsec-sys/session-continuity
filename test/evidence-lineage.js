@@ -1,4 +1,4 @@
-﻿import fs from "fs";
+import fs from "fs";
 import { appendEvidenceLineage, verifyEvidenceLineage } from "../src/evidence/evidence-lineage.js";
 
 const dir = "E:\\SESSION-CONTINUITY\\test\\fixtures\\lineage";

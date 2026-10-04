@@ -1,4 +1,4 @@
-﻿import fs from "fs";
+import fs from "fs";
 import path from "path";
 import { writeEvidenceBundle, verifyEvidenceBundle } from "../src/evidence/evidence-bundle.js";
 

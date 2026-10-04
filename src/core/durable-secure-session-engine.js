@@ -1,4 +1,4 @@
-﻿import crypto from "crypto";
+import crypto from "crypto";
 import { verifyContinuity } from "./continuity-verifier.js";
 import { verifySignedPresentation } from "./proof-of-possession.js";
 import { commitSessionAcceptance } from "./durable-secure-session-state.js";

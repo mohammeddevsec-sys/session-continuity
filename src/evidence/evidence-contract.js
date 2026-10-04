@@ -1,4 +1,4 @@
-﻿import crypto from "crypto";
+import crypto from "crypto";
 import { canonicalStringify } from "../core/canonical.js";
 
 const ALLOWED_DECISIONS = Object.freeze([

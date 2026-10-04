@@ -1,4 +1,4 @@
-﻿import crypto from "crypto";
+import crypto from "crypto";
 
 function randomChallenge() {
   return crypto.randomBytes(32).toString("base64url");

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * SIMULATED FORK SCENARIO — Proves that fork-registry works
  * when integrated at the correct point in a pipeline.
  */
