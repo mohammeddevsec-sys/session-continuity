@@ -29,3 +29,13 @@ patch-*.cjs
 *.tmp
 *.orig
 *.staging
+
+# Production manifest (regenerated, not tracked)
+PRODUCTION-MANIFEST.md
+PRODUCTION-MANIFEST.sha256
+
+# Transient audit reports
+audit-*.mjs
+audit-*.txt
+_AUDIT_*.txt
+CURRENT-STATE-AUDIT.txt
