@@ -18,6 +18,8 @@
                     "version":  "node bin/session-continuity.mjs --version",
                     "test:delegation":  "node test/delegation-chain.test.mjs",
                     "test:transparency":  "node test/transparency-log.test.mjs",
-                    "test:revocation":  "node test/revocation-rrp.test.mjs"
+                    "test:revocation":  "node test/revocation-rrp.test.mjs",
+                    "test:parent-binding":  "node test/parent-binding.test.mjs",
+                    "test:binding-store":  "node test/binding-store.test.mjs"
                 }
 }
