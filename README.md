@@ -102,23 +102,41 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
+## Fork Protection (Opt-in)
+
+Fork protection is implemented but **disabled by default** for backward compatibility.
+
+Enable via environment variable:
+
+    SC_FORK_PROTECTION=enabled node your-app.js
+
+When enabled, the engine uses `fork-registry` to block a second continuation from the same `(anchor_fingerprint, parent_sequence)`. The verifier returns `REAUTH_REQUIRED / FORK_DETECTED`.
+
+Isolated registry (useful in tests):
+
+    SC_FORK_REGISTRY_ROOT=/tmp/my-app node your-app.js
+
+Note: the default registry uses `os.tmpdir()`. Deployments on the same machine share it, which is what you want. For isolated per-instance registries, set `SC_FORK_REGISTRY_ROOT`.
+
+See `test/continuity-fork-attack.js` for a verified scenario.
+
+---
+
 ## Known Limitations
 
 This is an early-stage library. The following limitations are documented explicitly.
 
-1. **No fork attack prevention in the engine.** The core engine accepts two valid continuations from the same parent with the same sequence. Supporting primitives (parent-binding, binding-store, fork-guard) exist but are not integrated.
+1. **No strict sequence enforcement.** The engine accepts sequence jumps (e.g., 1 to 3) without verifying 2 exists.
 
-2. **No strict sequence enforcement.** The engine accepts sequence jumps (e.g., 1 to 3) without verifying 2 exists.
+2. **No third-party security audit.** The code has not been reviewed by an independent security team.
 
-3. **No third-party security audit.** The code has not been reviewed by an independent security team.
+3. **No BBS+ or ZK-SNARK privacy layer.** Session identifiers and subjects are visible in the evidence bundle.
 
-4. **No BBS+ or ZK-SNARK privacy layer.** Session identifiers and subjects are visible in the evidence bundle.
+4. **No hardware binding.** Sessions are not bound to TPM, Secure Enclave, or any hardware root of trust.
 
-5. **No hardware binding.** Sessions are not bound to TPM, Secure Enclave, or any hardware root of trust.
+5. **Performance testing is limited.** Revocation reachability was measured at 100 edges (11 ms). Larger graphs have not been benchmarked.
 
-6. **Performance testing is limited.** Revocation reachability was measured at 100 edges (11 ms). Larger graphs have not been benchmarked.
-
----
+6. **Fork protection is opt-in and shares state via the filesystem.** Works within one machine or a shared mount, but is not distributed. A centralized service is planned for v0.4.0.
 
 ## Roadmap
 

@@ -1,17 +1,14 @@
 ﻿/**
- * FORK ATTACK TEST — DOCUMENTS A KNOWN LIMITATION
+ * FORK ATTACK TEST
+ *
+ * Verifies that fork-registry blocks a second continuation from
+ * the same parent with the same sequence when SC_FORK_PROTECTION
+ * is enabled.
+ *
+ * Expected: FORK_ACCEPTED=NO, ATTACK_RESULT=PASS
  * 
- * This test demonstrates that the current engine (v0.2.0) accepts
- * two valid continuations from the same parent with the same sequence.
- * 
- * This is a DOCUMENTED LIMITATION, not a bug. Fork prevention requires
- * a centralized coordination service, which is out of scope for a 
- * standalone library.
- * 
- * Expected result: ATTACK_RESULT=FAIL (the attack succeeds)
- * This is correct and intentional for v0.2.0.
- * 
- * See README.md "Known Limitations" section.
+ * When SC_FORK_PROTECTION is disabled (default), the attack
+ * succeeds and FORK_ACCEPTED=YES.
  */
 
 import fs from "fs";
@@ -24,6 +21,9 @@ import { createDurableTrustStore } from "../src/evidence/durable-trust-store.js"
 import { createOidcSessionAnchor } from "../src/adapters/oidc-session-adapter.js";
 import { executeSessionContinuityDecision } from "../src/product/session-continuity-decision.js";
 import { verifySessionProvenanceReceipt } from "../src/evidence/session-provenance-receiver.js";
+
+process.env.SC_FORK_PROTECTION = "enabled";
+process.env.SC_FORK_REGISTRY_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), "sc-fork-test-"));
 
 const root=fs.mkdtempSync(path.join(os.tmpdir(),"continuity-fork-"));
 const authority=provisionSigningAuthority(path.join(root,"authority"),{label:"continuity-fork"});
@@ -51,10 +51,7 @@ const b=await accept(branchB,path.join(root,"p2B"),2);
 const va=verifySessionProvenanceReceipt({certificate:a.provenanceCertificate,durableTrustStore:trust,bundleDir:path.join(root,"p2A","bundle"),lineageDir:path.join(root,"p2A","lineage"),policyDecision:a.policy,expectedSessionId:a.provenanceCertificate?.session_id,expectedSubject:a.provenanceCertificate?.subject,expectedIssuer:a.provenanceCertificate?.issuer}).verified;
 const vb=verifySessionProvenanceReceipt({certificate:b.provenanceCertificate,durableTrustStore:trust,bundleDir:path.join(root,"p2B","bundle"),lineageDir:path.join(root,"p2B","lineage"),policyDecision:b.policy,expectedSessionId:b.provenanceCertificate?.session_id,expectedSubject:b.provenanceCertificate?.subject,expectedIssuer:b.provenanceCertificate?.issuer}).verified;
 
-console.log("=== CONTINUITY FORK ATTACK (DOCUMENTED LIMITATION) ===");
-console.log("NOTE: This test documents that v0.2.0 accepts fork attacks.");
-console.log("      This is a known limitation, not a bug.");
-console.log("      See README.md Known Limitations section.");
+console.log("=== CONTINUITY FORK ATTACK ===");
 console.log("");
 console.log("P1="+p1.decision);
 console.log("BRANCH_A_P2="+a.decision+"|SEQ="+a.provenanceCertificate?.sequence);
@@ -68,7 +65,5 @@ console.log("FORK_ACCEPTED="+(va&&vb?"YES":"NO"));
 console.log("NON_EQUIVOCATION_PROVEN="+(!(va&&vb)?"YES":"NO"));
 console.log("ATTACK_RESULT="+(va&&vb?"FAIL":"PASS"));
 console.log("");
-console.log("DOCUMENTED_LIMITATION=TRUE");
-console.log("EXPECTED_FOR_V0_2_0=FORK_ACCEPTED_YES");
 console.log("RESULT=PASS");
 fs.rmSync(root,{recursive:true,force:true});

@@ -46,6 +46,9 @@ function buildDiagnostic(reason, pipeline) {
   } else if (reasonCode.startsWith("PROVENANCE_")) {
     failureStage = "PROVENANCE";
     failureLocation = "session-provenance-certificate";
+  } else if (reasonCode === "FORK_DETECTED") {
+    failureStage = "FORK";
+    failureLocation = "fork-registry.claim";
   } else if (reasonCode.startsWith("POLICY_")) {
     failureStage = "POLICY";
     failureLocation = "evaluateSessionContinuityPolicy";

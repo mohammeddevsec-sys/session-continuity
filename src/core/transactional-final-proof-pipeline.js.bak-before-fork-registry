@@ -1,4 +1,4 @@
-﻿import fs from "fs";
+import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import { verifyContinuity } from "./continuity-verifier.js";
@@ -10,7 +10,6 @@ import { appendEvidenceLineage } from "../evidence/evidence-lineage.js";
 import { verifyEvidenceProof } from "../evidence/offline-verifier.js";
 import { signProof } from "../evidence/proof-signature.js";
 import { verifyDurableTrustedProof } from "../evidence/durable-trusted-proof-verifier.js";
-import { claimContinuationSlot, releaseContinuationSlot } from "./fork-registry.mjs";
 
 function sha256Text(text) {
   return crypto.createHash("sha256").update(Buffer.from(String(text),"utf8")).digest("hex").toLowerCase();
@@ -114,23 +113,8 @@ export function executeTransactionalFinalProofPipeline({
     if(!offline.verified) throw new Error("TRANSACTIONAL_OFFLINE_VERIFY_FAILED");
     if(!trusted.verified) throw new Error("TRANSACTIONAL_TRUST_FAILED");
 
-    let forkAnchorFp = null;
-    if (process.env.SC_FORK_PROTECTION === "enabled") {
-      forkAnchorFp = fingerprint(anchor);
-      const forkClaim = claimContinuationSlot({
-        anchorFingerprint: forkAnchorFp,
-        parentSequence: lastSequence,
-        metadata: { sessionId: anchor.sessionId, presentedSequence: sequence, timestamp }
-      });
-      if (!forkClaim.claimed) {
-        fs.rmSync(stagingRoot,{recursive:true,force:true});
-        return failure("REAUTH_REQUIRED","FORK_DETECTED",["fork"]);
-      }
-    }
-
     const committed=commitSessionAcceptance(durableState,anchor.sessionId,sequence,challenge,nowMs);
     if(committed.decision!=="CONTINUOUS"){
-      if (forkAnchorFp) releaseContinuationSlot({ anchorFingerprint: forkAnchorFp, parentSequence: lastSequence });
       fs.rmSync(stagingRoot,{recursive:true,force:true});
       return failure(committed.decision,committed.reason,["sequence"]);
     }
